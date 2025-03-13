@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,22 +16,72 @@ interface AddProductFormProps {
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
   type?: "product" | "service";
+  initialData?: {
+    name?: string;
+    description?: string;
+    price?: number;
+    unit?: string;
+    taxRate?: number;
+    sku?: string;
+    active?: boolean;
+  };
 }
 
 const AddProductForm = ({
   onSubmit = () => {},
   onCancel = () => {},
   type = "product",
+  initialData = {},
 }: AddProductFormProps) => {
+  const [name, setName] = useState(initialData.name || "");
+  const [description, setDescription] = useState(initialData.description || "");
+  const [price, setPrice] = useState(initialData.price?.toString() || "");
+  const [unit, setUnit] = useState(initialData.unit || (type === "product" ? "item" : "hour"));
+  const [taxRate, setTaxRate] = useState(initialData.taxRate?.toString() || "10");
+  const [sku, setSku] = useState(initialData.sku || "");
+  const [active, setActive] = useState(initialData.active !== false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!name.trim()) {
+      newErrors.name = "Name is required";
+    }
+    
+    if (!price.trim()) {
+      newErrors.price = "Price is required";
+    } else if (isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+      newErrors.price = "Price must be a valid positive number";
+    }
+    
+    if (taxRate && (isNaN(parseFloat(taxRate)) || parseFloat(taxRate) < 0)) {
+      newErrors.taxRate = "Tax rate must be a valid positive number";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would collect form data and validate
-    onSubmit({
-      name: "New Product",
-      type: type,
-      description: "Product description",
-      price: 99.99,
-    });
+    
+    if (!validate()) {
+      return;
+    }
+    
+    const formData = {
+      name,
+      description,
+      price: parseFloat(price),
+      unit,
+      taxRate: taxRate ? parseFloat(taxRate) : undefined,
+      sku,
+      active,
+      type
+    };
+    
+    onSubmit(formData);
   };
 
   return (
@@ -39,7 +89,14 @@ const AddProductForm = ({
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
-          <Input id="name" placeholder={`Enter ${type} name`} required />
+          <Input 
+            id="name" 
+            placeholder={`Enter ${type} name`} 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required 
+          />
+          {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
         </div>
 
         <div className="space-y-2">
@@ -48,6 +105,8 @@ const AddProductForm = ({
             id="description"
             placeholder={`Describe your ${type}`}
             className="resize-none h-24"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 
@@ -60,13 +119,16 @@ const AddProductForm = ({
               min="0"
               step="0.01"
               placeholder="0.00"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
               required
             />
+            {errors.price && <p className="text-sm text-destructive">{errors.price}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="unit">Unit</Label>
-            <Select defaultValue={type === "product" ? "item" : "hour"}>
+            <Select value={unit} onValueChange={setUnit}>
               <SelectTrigger id="unit">
                 <SelectValue placeholder="Select unit" />
               </SelectTrigger>
@@ -99,8 +161,10 @@ const AddProductForm = ({
               type="number"
               min="0"
               step="0.1"
-              defaultValue="10"
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
             />
+            {errors.taxRate && <p className="text-sm text-destructive">{errors.taxRate}</p>}
           </div>
 
           <div className="space-y-2">
@@ -110,12 +174,18 @@ const AddProductForm = ({
             <Input
               id="sku"
               placeholder={`Enter ${type === "product" ? "SKU" : "service code"}`}
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
             />
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <Switch id="active" defaultChecked />
+          <Switch 
+            id="active" 
+            checked={active}
+            onCheckedChange={setActive}
+          />
           <Label htmlFor="active">Active</Label>
         </div>
       </div>

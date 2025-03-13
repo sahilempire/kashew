@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   ShoppingBag,
   Package,
+  Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,85 +29,150 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import AddProductModal from "@/components/modals/AddProductModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { productService } from "@/lib/database";
+import { Product } from "@/lib/models";
+import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils";
 
 export default function ProductsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"all" | "products" | "services">("all");
 
-  // Products data
-  const productsData = [
-    {
-      id: "1",
-      name: "Website Design",
-      type: "Service",
-      description: "Custom website design and development",
-      price: 2500.0,
-      unit: "Project",
-      taxRate: 10,
-    },
-    {
-      id: "2",
-      name: "Logo Design",
-      type: "Service",
-      description: "Professional logo design with revisions",
-      price: 800.0,
-      unit: "Project",
-      taxRate: 10,
-    },
-    {
-      id: "3",
-      name: "SEO Optimization",
-      type: "Service",
-      description: "Search engine optimization services",
-      price: 1200.0,
-      unit: "Month",
-      taxRate: 10,
-    },
-    {
-      id: "4",
-      name: "Content Writing",
-      type: "Service",
-      description: "Professional content writing services",
-      price: 120.0,
-      unit: "Hour",
-      taxRate: 10,
-    },
-    {
-      id: "5",
-      name: "Web Hosting",
-      type: "Product",
-      description: "Premium web hosting package",
-      price: 150.0,
-      unit: "Year",
-      taxRate: 10,
-    },
-    {
-      id: "6",
-      name: "Domain Name",
-      type: "Product",
-      description: "Domain name registration",
-      price: 15.0,
-      unit: "Year",
-      taxRate: 10,
-    },
-  ];
+  useEffect(() => {
+    if (user) {
+      loadProducts();
+    }
+  }, [user, activeTab]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+  const loadProducts = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      let data: Product[];
+      
+      if (activeTab === "products") {
+        data = await productService.getAll(user.id, "product");
+      } else if (activeTab === "services") {
+        data = await productService.getAll(user.id, "service");
+      } else {
+        data = await productService.getAll(user.id);
+      }
+      
+      setProducts(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading products:", err);
+      setError("Failed to load products. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddProduct = (data: any) => {
-    console.log("New product data:", data);
-    // In a real app, we would add the product to the database
+  const handleSearch = async () => {
+    if (!user || !searchQuery.trim()) {
+      await loadProducts();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      let data: Product[];
+      
+      if (activeTab === "products") {
+        data = await productService.search(user.id, searchQuery, "product");
+      } else if (activeTab === "services") {
+        data = await productService.search(user.id, searchQuery, "service");
+      } else {
+        data = await productService.search(user.id, searchQuery);
+      }
+      
+      setProducts(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error searching products:", err);
+      setError("Failed to search products. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddService = (data: any) => {
-    console.log("New service data:", data);
-    // In a real app, we would add the service to the database
+  const handleAddProduct = async (data: any) => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      await productService.create(user.id, {
+        ...data,
+        type: "product"
+      });
+      await loadProducts();
+      setAddProductOpen(false);
+    } catch (err) {
+      console.error("Error adding product:", err);
+      setError("Failed to add product. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddService = async (data: any) => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      await productService.create(user.id, {
+        ...data,
+        type: "service"
+      });
+      await loadProducts();
+      setAddServiceOpen(false);
+    } catch (err) {
+      console.error("Error adding service:", err);
+      setError("Failed to add service. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!user) return;
+    
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        setLoading(true);
+        await productService.delete(user.id, id);
+        await loadProducts();
+      } catch (err) {
+        console.error("Error deleting product:", err);
+        setError("Failed to delete item. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleViewProduct = (id: string) => {
+    router.push(`/products/${id}`);
+  };
+
+  const handleEditProduct = (id: string) => {
+    router.push(`/products/${id}/edit`);
   };
 
   return (
@@ -121,18 +187,17 @@ export default function ProductsPage() {
           </div>
           <div className="flex gap-3">
             <Button
-              variant="outline"
-              className="gap-2 rounded-full"
+              className="gap-2 rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
               onClick={() => setAddProductOpen(true)}
             >
               <Package className="h-4 w-4" />
               Add Product
             </Button>
             <Button
-              className="gap-2 rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+              className="gap-2 rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
               onClick={() => setAddServiceOpen(true)}
             >
-              <Plus className="h-4 w-4" />
+              <Package className="h-4 w-4" />
               Add Service
             </Button>
           </div>
@@ -174,82 +239,253 @@ export default function ProductsPage() {
         </div>
 
         <div className="modern-card bg-background">
-          <div className="p-6 pb-0">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Catalog</h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search catalog..."
-                  className="w-[250px] pl-8 rounded-full"
-                />
+          <Tabs defaultValue="all" className="w-full" onValueChange={(value) => setActiveTab(value as "all" | "products" | "services")}>
+            <div className="p-6 pb-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <TabsList className="w-full sm:w-auto">
+                  <TabsTrigger value="all">All Items</TabsTrigger>
+                  <TabsTrigger value="products">Products</TabsTrigger>
+                  <TabsTrigger value="services">Services</TabsTrigger>
+                </TabsList>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Search items..."
+                      className="w-full sm:w-[250px] pl-8 rounded-full"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    />
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="rounded-full"
+                    onClick={handleSearch}
+                  >
+                    Search
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="p-6 pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Tax Rate</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {productsData.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">
-                      {product.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`rounded-full px-3 ${product.type === "Service" ? "bg-vibrant-pink text-black" : "bg-vibrant-yellow text-black"}`}
-                      >
-                        {product.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {product.description}
-                    </TableCell>
-                    <TableCell>{formatCurrency(product.price)}</TableCell>
-                    <TableCell>Per {product.unit}</TableCell>
-                    <TableCell>{product.taxRate}%</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
+            {error && (
+              <div className="p-6 text-red-500">
+                {error}
+              </div>
+            )}
+
+            <TabsContent value="all" className="p-6 pt-0">
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-vibrant-yellow" />
+                </div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No items found matching your search." : "No products or services yet. Add your first item to get started."}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Tax Rate</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`rounded-full px-3 ${product.type === "product" ? "bg-vibrant-yellow text-black" : "bg-vibrant-green text-white"}`}
                           >
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>Edit Item</DropdownMenuItem>
-                          <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                            {product.type === "product" ? "Product" : "Service"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate">{product.description || '-'}</TableCell>
+                        <TableCell>{formatCurrency(product.price)}</TableCell>
+                        <TableCell>{product.unit}</TableCell>
+                        <TableCell>{product.taxRate ? `${product.taxRate}%` : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewProduct(product.id)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditProduct(product.id)}>
+                                Edit Item
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => handleDeleteProduct(product.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="products" className="p-6 pt-0">
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-vibrant-yellow" />
+                </div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No products found matching your search." : "No products yet. Add your first product to get started."}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Tax Rate</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{product.description || '-'}</TableCell>
+                        <TableCell>{formatCurrency(product.price)}</TableCell>
+                        <TableCell>{product.unit}</TableCell>
+                        <TableCell>{product.taxRate ? `${product.taxRate}%` : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewProduct(product.id)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditProduct(product.id)}>
+                                Edit Product
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => handleDeleteProduct(product.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="services" className="p-6 pt-0">
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-vibrant-yellow" />
+                </div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No services found matching your search." : "No services yet. Add your first service to get started."}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Tax Rate</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{product.description || '-'}</TableCell>
+                        <TableCell>{formatCurrency(product.price)}</TableCell>
+                        <TableCell>{product.unit}</TableCell>
+                        <TableCell>{product.taxRate ? `${product.taxRate}%` : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewProduct(product.id)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditProduct(product.id)}>
+                                Edit Service
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => handleDeleteProduct(product.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Add Product Modal */}

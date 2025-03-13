@@ -12,6 +12,14 @@ export const metadata: Metadata = {
   title: "Kashew - Modern Invoicing Platform",
   description:
     "A comprehensive invoicing web application with AI-powered features",
+  icons: {
+    icon: [
+      { url: '/images/Kashew.png' }
+    ],
+    apple: [
+      { url: '/images/Kashew.png' }
+    ]
+  }
 };
 
 export default function RootLayout({
@@ -21,6 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/images/Kashew.png" />
+        <link rel="apple-touch-icon" href="/images/Kashew.png" />
+      </head>
       <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />
       <body className={inter.className}>
         <ThemeProvider

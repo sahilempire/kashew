@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,14 +21,12 @@ interface AddClientFormProps {
     address?: string;
     city?: string;
     state?: string;
-    zip?: string;
+    zipCode?: string;
     country?: string;
-    contactName?: string;
-    contactEmail?: string;
-    contactPhone?: string;
-    position?: string;
+    companyName?: string;
+    website?: string;
+    notes?: string;
     taxId?: string;
-    paymentTerms?: string;
   };
 }
 
@@ -37,159 +35,203 @@ const AddClientForm = ({
   onCancel = () => {},
   initialData = {},
 }: AddClientFormProps) => {
+  const [name, setName] = useState(initialData.name || "");
+  const [email, setEmail] = useState(initialData.email || "");
+  const [phone, setPhone] = useState(initialData.phone || "");
+  const [address, setAddress] = useState(initialData.address || "");
+  const [city, setCity] = useState(initialData.city || "");
+  const [state, setState] = useState(initialData.state || "");
+  const [zipCode, setZipCode] = useState(initialData.zipCode || "");
+  const [country, setCountry] = useState(initialData.country || "United States");
+  const [companyName, setCompanyName] = useState(initialData.companyName || "");
+  const [website, setWebsite] = useState(initialData.website || "");
+  const [notes, setNotes] = useState(initialData.notes || "");
+  const [taxId, setTaxId] = useState(initialData.taxId || "");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!name.trim()) {
+      newErrors.name = "Name is required";
+    }
+    
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const data = {
-      name: formData.get('companyName') as string,
-      email: formData.get('email') as string,
-      phone: formData.get('phone') as string,
-      address: formData.get('address') as string,
-      city: formData.get('city') as string,
-      state: formData.get('state') as string,
-      zip: formData.get('zip') as string,
-      country: formData.get('country') as string,
-      contactName: `${formData.get('firstName')} ${formData.get('lastName')}`,
-      contactEmail: formData.get('contactEmail') as string,
-      contactPhone: formData.get('contactPhone') as string,
-      position: formData.get('position') as string,
-      taxId: formData.get('taxId') as string,
-      paymentTerms: formData.get('paymentTerms') as string,
+    
+    if (!validate()) {
+      return;
+    }
+    
+    const formData = {
+      name,
+      email,
+      phone,
+      address,
+      city,
+      state,
+      zipCode,
+      country,
+      companyName,
+      website,
+      notes,
+      taxId
     };
-    onSubmit(data);
+    
+    onSubmit(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-medium">Company Information</h3>
-        <div className="space-y-2">
-          <Label htmlFor="companyName">Company Name</Label>
-          <Input id="companyName" placeholder="Enter company name" required defaultValue={initialData.name} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input 
+              id="name" 
+              placeholder="Enter client name" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required 
+            />
+            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="company">Company Name (Optional)</Label>
+            <Input 
+              id="company" 
+              placeholder="Enter company name" 
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="company@example.com"
-              required
-              defaultValue={initialData.email}
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="client@example.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" type="tel" placeholder="(555) 123-4567" defaultValue={initialData.phone} />
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input 
+              id="phone" 
+              placeholder="(123) 456-7890" 
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="address">Address</Label>
-          <Textarea
-            id="address"
-            placeholder="Enter company address"
-            className="resize-none h-20"
-            defaultValue={initialData.address}
+          <Input 
+            id="address" 
+            placeholder="Street address" 
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="city">City</Label>
-            <Input id="city" placeholder="City" defaultValue={initialData.city} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="state">State/Province</Label>
-            <Input id="state" placeholder="State/Province" defaultValue={initialData.state} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="zip">Zip/Postal Code</Label>
-            <Input id="zip" placeholder="Zip/Postal Code" defaultValue={initialData.zip} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="country">Country</Label>
-          <Select defaultValue={initialData.country}>
-            <SelectTrigger id="country">
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="us">United States</SelectItem>
-              <SelectItem value="ca">Canada</SelectItem>
-              <SelectItem value="uk">United Kingdom</SelectItem>
-              <SelectItem value="au">Australia</SelectItem>
-              <SelectItem value="de">Germany</SelectItem>
-              <SelectItem value="fr">France</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Primary Contact</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" placeholder="First name" required defaultValue={initialData.contactName?.split(' ')[0]} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Last Name</Label>
-            <Input id="lastName" placeholder="Last name" required defaultValue={initialData.contactName?.split(' ')[1]} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="contactEmail">Email</Label>
-            <Input
-              id="contactEmail"
-              type="email"
-              placeholder="contact@example.com"
-              required
-              defaultValue={initialData.contactEmail}
+            <Input 
+              id="city" 
+              placeholder="City" 
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="contactPhone">Phone</Label>
-            <Input id="contactPhone" type="tel" placeholder="(555) 123-4567" defaultValue={initialData.contactPhone} />
+            <Label htmlFor="state">State/Province</Label>
+            <Input 
+              id="state" 
+              placeholder="State/Province" 
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="zip">ZIP/Postal Code</Label>
+            <Input 
+              id="zip" 
+              placeholder="ZIP/Postal Code" 
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select value={country} onValueChange={setCountry}>
+              <SelectTrigger id="country">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="United States">United States</SelectItem>
+                <SelectItem value="Canada">Canada</SelectItem>
+                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                <SelectItem value="Australia">Australia</SelectItem>
+                <SelectItem value="Germany">Germany</SelectItem>
+                <SelectItem value="France">France</SelectItem>
+                <SelectItem value="Japan">Japan</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="website">Website (Optional)</Label>
+            <Input 
+              id="website" 
+              placeholder="https://example.com" 
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="position">Position</Label>
-          <Input id="position" placeholder="Job title" defaultValue={initialData.position} />
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Billing Information</h3>
-        <div className="space-y-2">
-          <Label htmlFor="taxId">Tax ID / VAT Number</Label>
-          <Input id="taxId" placeholder="Enter tax ID or VAT number" defaultValue={initialData.taxId} />
+          <Label htmlFor="taxId">Tax ID / VAT Number (Optional)</Label>
+          <Input 
+            id="taxId" 
+            placeholder="Enter tax ID or VAT number" 
+            value={taxId}
+            onChange={(e) => setTaxId(e.target.value)}
+          />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="paymentTerms">Payment Terms</Label>
-          <Select defaultValue={initialData.paymentTerms}>
-            <SelectTrigger id="paymentTerms">
-              <SelectValue placeholder="Select payment terms" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Net 7 - Due in 7 days</SelectItem>
-              <SelectItem value="15">Net 15 - Due in 15 days</SelectItem>
-              <SelectItem value="30">Net 30 - Due in 30 days</SelectItem>
-              <SelectItem value="60">Net 60 - Due in 60 days</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Textarea
+            id="notes"
+            placeholder="Add any additional information about this client"
+            className="resize-none h-24"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
         </div>
       </div>
 
@@ -214,3 +256,4 @@ const AddClientForm = ({
 };
 
 export default AddClientForm;
+

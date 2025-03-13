@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, MoreHorizontal, Users } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -22,69 +22,104 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddClientModal from "@/components/modals/AddClientModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { clientService } from "@/lib/database";
+import { Client } from "@/lib/models";
+import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils";
 
 export default function ClientsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [addClientOpen, setAddClientOpen] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  // Clients data
-  const clientsData = [
-    {
-      id: "1",
-      name: "Acme Corporation",
-      contactName: "John Smith",
-      email: "john@acmecorp.com",
-      phone: "(555) 123-4567",
-      totalInvoices: 5,
-      totalSpent: 12500.0,
-    },
-    {
-      id: "2",
-      name: "Globex Industries",
-      contactName: "Jane Doe",
-      email: "jane@globex.com",
-      phone: "(555) 987-6543",
-      totalInvoices: 3,
-      totalSpent: 8450.75,
-    },
-    {
-      id: "3",
-      name: "Wayne Enterprises",
-      contactName: "Bruce Wayne",
-      email: "bruce@wayne.com",
-      phone: "(555) 228-6283",
-      totalInvoices: 7,
-      totalSpent: 32670.25,
-    },
-    {
-      id: "4",
-      name: "Stark Industries",
-      contactName: "Tony Stark",
-      email: "tony@stark.com",
-      phone: "(555) 482-9273",
-      totalInvoices: 4,
-      totalSpent: 18340.5,
-    },
-    {
-      id: "5",
-      name: "Umbrella Corporation",
-      contactName: "Albert Wesker",
-      email: "wesker@umbrella.com",
-      phone: "(555) 666-7890",
-      totalInvoices: 2,
-      totalSpent: 5890.0,
-    },
-  ];
+  useEffect(() => {
+    if (user) {
+      loadClients();
+    }
+  }, [user]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+  const loadClients = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      const data = await clientService.getAll(user.id);
+      setClients(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading clients:", err);
+      setError("Failed to load clients. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddClient = (data: any) => {
-    console.log("New client data:", data);
-    // In a real app, we would add the client to the database
+  const handleSearch = async () => {
+    if (!user || !searchQuery.trim()) {
+      await loadClients();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const data = await clientService.search(user.id, searchQuery);
+      setClients(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error searching clients:", err);
+      setError("Failed to search clients. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddClient = async (data: any) => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      await clientService.create(user.id, data);
+      await loadClients();
+    } catch (err) {
+      console.error("Error adding client:", err);
+      setError("Failed to add client. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (!user) return;
+    
+    if (window.confirm("Are you sure you want to delete this client?")) {
+      try {
+        setLoading(true);
+        await clientService.delete(user.id, id);
+        await loadClients();
+      } catch (err) {
+        console.error("Error deleting client:", err);
+        setError("Failed to delete client. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleViewClient = (id: string) => {
+    router.push(`/clients/${id}`);
+  };
+
+  const handleEditClient = (id: string) => {
+    router.push(`/clients/${id}/edit`);
+  };
+
+  const handleCreateInvoice = (clientId: string) => {
+    router.push(`/invoices/new?client=${clientId}`);
   };
 
   return (
@@ -106,104 +141,109 @@ export default function ClientsPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="modern-card bg-vibrant-yellow p-6">
-            <div className="rounded-full bg-black/10 p-3 w-fit">
-              <Users className="h-6 w-6 text-black" />
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-black/70">Total Clients</p>
-              <h3 className="text-3xl font-bold text-black">5</h3>
-            </div>
-          </div>
-
-          <div className="modern-card bg-vibrant-pink p-6">
-            <div className="rounded-full bg-black/10 p-3 w-fit">
-              <Users className="h-6 w-6 text-black" />
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-black/70">Active Clients</p>
-              <h3 className="text-3xl font-bold text-black">4</h3>
-            </div>
-          </div>
-
-          <div className="modern-card bg-vibrant-green p-6">
-            <div className="rounded-full bg-white/10 p-3 w-fit">
-              <Users className="h-6 w-6 text-white" />
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-white/70">Total Revenue</p>
-              <h3 className="text-3xl font-bold text-white">$77,850</h3>
-            </div>
-          </div>
-        </div>
-
         <div className="modern-card bg-background">
           <div className="p-6 pb-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Client List</h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search clients..."
-                  className="w-[250px] pl-8 rounded-full"
-                />
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search clients..."
+                    className="w-[250px] pl-8 rounded-full"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="rounded-full"
+                  onClick={handleSearch}
+                >
+                  Search
+                </Button>
               </div>
             </div>
           </div>
 
+          {error && (
+            <div className="p-6 text-red-500">
+              {error}
+            </div>
+          )}
+
           <div className="p-6 pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Invoices</TableHead>
-                  <TableHead>Total Spent</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientsData.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>{client.contactName}</TableCell>
-                    <TableCell>{client.email}</TableCell>
-                    <TableCell>{client.phone}</TableCell>
-                    <TableCell>{client.totalInvoices}</TableCell>
-                    <TableCell>{formatCurrency(client.totalSpent)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit Client</DropdownMenuItem>
-                          <DropdownMenuItem>Create Invoice</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-vibrant-yellow" />
+              </div>
+            ) : clients.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchQuery ? "No clients found matching your search." : "No clients yet. Add your first client to get started."}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Invoices</TableHead>
+                    <TableHead>Total Spent</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {clients.map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">{client.name}</TableCell>
+                      <TableCell>{client.companyName || '-'}</TableCell>
+                      <TableCell>{client.email}</TableCell>
+                      <TableCell>{client.phone || '-'}</TableCell>
+                      <TableCell>{client.totalInvoices || 0}</TableCell>
+                      <TableCell>{formatCurrency(client.totalSpent || 0)}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewClient(client.id)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClient(client.id)}>
+                              Edit Client
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCreateInvoice(client.id)}>
+                              Create Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleDeleteClient(client.id)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
 
