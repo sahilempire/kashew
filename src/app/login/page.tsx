@@ -1,38 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { signIn, signUp } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setIsLoading(true);
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        if (!name) {
+          throw new Error("Name is required");
+        }
+        await signUp(email, password, name);
       } else {
         await signIn(email, password);
       }
       router.push("/ai");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(
+        isSignUp
+          ? "Failed to create account. Please try again."
+          : "Failed to sign in. Please check your credentials."
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -56,52 +65,73 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {error && (
+            <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm mb-4">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  placeholder="John Doe"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
               <Input
+                id="email"
                 type="email"
-                placeholder="Email"
+                placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full"
+                disabled={isLoading}
               />
             </div>
-            <div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
               <Input
+                id="password"
                 type="password"
-                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full"
+                disabled={isLoading}
               />
             </div>
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
+
             <Button
               type="submit"
               className="w-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading
-                ? "Loading..."
-                : isSignUp
-                ? "Create Account"
-                : "Sign In"}
+              {isLoading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
             </Button>
-            <Button
+          </form>
+
+          <div className="text-center">
+            <button
               type="button"
-              variant="ghost"
-              className="w-full"
               onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-primary hover:underline"
+              disabled={isLoading}
             >
               {isSignUp
                 ? "Already have an account? Sign in"
                 : "Don't have an account? Sign up"}
-            </Button>
-          </form>
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

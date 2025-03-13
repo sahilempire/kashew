@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Github, Mail, AlertCircle, Loader2 } from "lucide-react";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
 interface AuthFormProps {
@@ -41,9 +41,12 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
       if (formType === "login") {
         await signIn(email, password);
       } else {
+        if (!name) {
+          throw new Error("Name is required");
+        }
         await signUp(email, password, name);
       }
-      router.push("/");
+      router.push("/ai");
     } catch (err) {
       setError(
         formType === "login"
@@ -61,10 +64,8 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
 
     try {
       await googleSignIn();
-      router.push("/");
     } catch (err) {
       setError("Failed to sign in with Google. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };

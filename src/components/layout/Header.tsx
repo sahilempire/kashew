@@ -2,7 +2,7 @@ import React from "react";
 import { Bell, Search, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,19 +49,12 @@ const Header = ({ title = "Dashboard", className = "" }: HeaderProps) => {
             <DropdownMenuTrigger asChild>
               <div className="h-8 w-8 rounded-full bg-vibrant-yellow flex items-center justify-center cursor-pointer">
                 <span className="text-sm font-medium text-black">
-                  {user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()}
+                  {user.email?.charAt(0).toUpperCase()}
                 </span>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                {user.email}
-              </DropdownMenuLabel>
+              <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut()}
