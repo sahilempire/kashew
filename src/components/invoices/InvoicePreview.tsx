@@ -23,6 +23,7 @@ interface InvoicePreviewProps {
     dueDate: string;
   };
   className?: string;
+  scale?: number;
   customization?: {
     colors: {
       primary: string;
@@ -44,6 +45,7 @@ const InvoicePreview = ({
   templateId = 1,
   invoiceData,
   className = "",
+  scale = 1,
   customization,
 }: InvoicePreviewProps) => {
   const formatCurrency = (amount: number) => {
@@ -134,7 +136,10 @@ const InvoicePreview = ({
   const styles = getTemplateStyles();
 
   return (
-    <div className={cn("w-full max-w-2xl mx-auto", className)}>
+    <div 
+      className={cn("w-full max-w-2xl mx-auto", className)}
+      style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
+    >
       <Card className="modern-card overflow-hidden shadow-lg">
         {/* Logo */}
         {customization?.logo.enabled && customization.logo.url && (
@@ -153,7 +158,9 @@ const InvoicePreview = ({
             customization ? "" : styles.mainColor,
             styles.headerStyle,
           )}
-          style={customization ? styles.mainColorStyle : {}}
+          style={
+            customization && 'mainColorStyle' in styles ? styles.mainColorStyle : {}
+          }
         >
           <div className="flex justify-between items-start">
             <div>
@@ -163,9 +170,7 @@ const InvoicePreview = ({
                   customization ? "" : styles.textColor,
                 )}
                 style={
-                  customization
-                    ? { ...styles.textColorStyle, ...styles.fontStyle }
-                    : {}
+                  customization && 'textColorStyle' in styles ? { ...styles.textColorStyle, ...styles.fontStyle } : {}
                 }
               >
                 INVOICE
@@ -176,9 +181,7 @@ const InvoicePreview = ({
                   customization ? "" : styles.textColor,
                 )}
                 style={
-                  customization
-                    ? { ...styles.textColorStyle, ...styles.fontStyle }
-                    : {}
+                  customization && 'textColorStyle' in styles ? { ...styles.textColorStyle, ...styles.fontStyle } : {}
                 }
               >
                 #
@@ -193,9 +196,7 @@ const InvoicePreview = ({
                 customization ? "" : styles.textColor,
               )}
               style={
-                customization
-                  ? { ...styles.textColorStyle, ...styles.fontStyle }
-                  : {}
+                customization && 'textColorStyle' in styles ? { ...styles.textColorStyle, ...styles.fontStyle } : {}
               }
             >
               <div className="font-bold text-lg">Kashew</div>
@@ -207,7 +208,7 @@ const InvoicePreview = ({
         {/* Invoice Content */}
         <div
           className={styles.contentStyle}
-          style={customization ? styles.fontStyle : {}}
+          style={customization && 'fontStyle' in styles ? styles.fontStyle : {}}
         >
           <div className="grid grid-cols-2 gap-6 mb-8">
             <div>

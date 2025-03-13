@@ -9,6 +9,22 @@ import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+const CustomIconLeft = (props: any) => <ChevronLeft className="h-4 w-4" {...props} />;
+const CustomIconRight = (props: any) => <ChevronRight className="h-4 w-4" {...props} />;
+
+function CustomHeader({ onPreviousClick, onNextClick }: any) {
+  return (
+    <div className="flex justify-between items-center">
+      <button onClick={onPreviousClick} className="h-7 w-7">
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button onClick={onNextClick} className="h-7 w-7">
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 function Calendar({
   className,
   classNames,
@@ -52,10 +68,6 @@ function Calendar({
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
         ...classNames,
-      }}
-      components={{
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
     />

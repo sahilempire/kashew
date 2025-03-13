@@ -96,22 +96,10 @@ export default function PaymentsPage() {
     });
   };
 
-  const statusStyles = {
-    completed: {
-      variant: "secondary" as const,
-      label: "Completed",
-      className: "bg-vibrant-green text-white hover:bg-vibrant-green",
-    },
-    pending: {
-      variant: "outline" as const,
-      label: "Pending",
-      className: "bg-vibrant-yellow text-black hover:bg-vibrant-yellow",
-    },
-    failed: {
-      variant: "destructive" as const,
-      label: "Failed",
-      className: "bg-vibrant-pink text-black hover:bg-vibrant-pink",
-    },
+  const statusStyles: Record<string, { variant: "secondary" | "outline" | "destructive"; label: string; className: string }> = {
+    completed: { variant: "secondary", label: "Completed", className: "text-green-500" },
+    pending: { variant: "outline", label: "Pending", className: "text-yellow-500" },
+    failed: { variant: "destructive", label: "Failed", className: "text-red-500" },
   };
 
   return (
