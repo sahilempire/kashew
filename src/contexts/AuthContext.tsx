@@ -21,12 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      console.warn('Supabase is not properly configured. Authentication features will not work.');
-      setLoading(false);
-      return;
-    }
-
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -43,9 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    if (!isSupabaseConfigured) {
-      throw new Error('Supabase is not properly configured. Please check your environment variables.');
-    }
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -54,9 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    if (!isSupabaseConfigured) {
-      throw new Error('Supabase is not properly configured. Please check your environment variables.');
-    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -70,17 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured) {
-      throw new Error('Supabase is not properly configured. Please check your environment variables.');
-    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
 
   const googleSignIn = async () => {
-    if (!isSupabaseConfigured) {
-      throw new Error('Supabase is not properly configured. Please check your environment variables.');
-    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -98,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp, 
       signOut, 
       googleSignIn,
-      isConfigured: isSupabaseConfigured 
+      isConfigured: isSupabaseConfigured
     }}>
       {children}
     </AuthContext.Provider>
