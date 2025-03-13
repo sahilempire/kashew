@@ -1,19 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import Image from "next/image";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Send,
-  Sparkles,
-  FileText,
-  RotateCcw,
-  PieChart,
-  BarChart3,
-} from "lucide-react";
-import dynamic from "next/dynamic";
 import {
   Select,
   SelectContent,
@@ -22,6 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Send,
+  Sparkles,
+  FileText,
+  RotateCcw,
+  PieChart,
+  BarChart3,
+} from "lucide-react";
 
 const InvoicePreview = dynamic(
   () => import("@/components/invoices/InvoicePreview"),
@@ -29,10 +33,10 @@ const InvoicePreview = dynamic(
     ssr: false,
   }
 );
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AIPage() {
   const router = useRouter();
+  const { user, loading, signOut } = useAuth();
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<
     { role: string; content: string }[]
@@ -51,6 +55,20 @@ export default function AIPage() {
   const [selectedTemplate, setSelectedTemplate] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<any>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-vibrant-yellow"></div>
+      </div>
+    );
+  }
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
@@ -571,64 +589,205 @@ export default function AIPage() {
     setMessage("");
   };
 
-  const handleConfirm = () => {
-    // Debugging logs
-    console.log('Confirm & Save clicked');
-    console.log('Preview Type:', previewType);
-    console.log('Preview Data:', previewData);
+  const handleEdit = () => {
+    if (previewType !== "none" && previewData) {
+      // Add guidance message to chat
+      const editGuidanceMessage = getEditGuidanceMessage(previewType);
+      setChatHistory([
+        ...chatHistory,
+        { role: "assistant", content: editGuidanceMessage },
+      ]);
 
-    // Save data to the backend
-    const saveToBackend = async () => {
-      try {
-        // In a real app, this would be an API call to save the data
-        // For now, we'll simulate a successful save
-        console.log(`Saving ${previewType} data to backend:`, previewData);
+      // Initialize edited data with proper type checking
+      let initialEditedData = { ...previewData };
 
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Add confirmation message to chat history
-        const confirmationMessage = `I've saved the ${previewType} to your dashboard. You can access it there anytime.`;
-        setChatHistory([
-          ...chatHistory,
-          { role: "assistant", content: confirmationMessage },
-        ]);
-
-        // Store in localStorage as a temporary backend
-        const existingData = JSON.parse(
-          localStorage.getItem("kashewData") || "{}"
-        );
-        const updatedData = {
-          ...existingData,
-          [previewType]: [
-            ...(existingData[previewType] || []),
-            {
-              id: Date.now().toString(),
-              ...previewData,
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        };
-        localStorage.setItem("kashewData", JSON.stringify(updatedData));
-
-        // Reset preview state
-        setPreviewType("none");
-        setPreviewData(null);
-      } catch (error) {
-        console.error("Error saving data:", error);
-        setChatHistory([
-          ...chatHistory,
-          {
-            role: "assistant",
-            content:
-              "Sorry, there was an error saving your data. Please try again.",
-          },
-        ]);
+      // Add specific initializations based on content type
+      switch (previewType) {
+        case "client":
+          initialEditedData = {
+            ...initialEditedData,
+            name: previewData.name || "",
+            contactName: previewData.contactName || "",
+            email: previewData.email || "",
+            phone: previewData.phone || "",
+            address: previewData.address || "",
+          };
+          break;
+        case "product":
+          initialEditedData = {
+            ...initialEditedData,
+            name: previewData.name || "",
+            type: previewData.type || "Product",
+            description: previewData.description || "",
+            price: previewData.price || 0,
+            unit: previewData.unit || "",
+            taxRate: previewData.taxRate || 0,
+          };
+          break;
+        case "invoice":
+          initialEditedData = {
+            ...initialEditedData,
+            client: previewData.client || { name: "" },
+            dueDate: previewData.dueDate || "",
+            items: previewData.items || [],
+            subtotal: previewData.subtotal || 0,
+            tax: previewData.tax || 0,
+            total: previewData.total || 0,
+          };
+          break;
+        case "report":
+        case "chart":
+          initialEditedData = { ...previewData };
+          break;
       }
-    };
 
-    // Execute the save function
-    saveToBackend();
+      setIsEditing(true);
+      setEditedData(initialEditedData);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!previewType || !previewData || !user) {
+      console.error("No data to save or user not authenticated");
+      return;
+    }
+
+    // Validate data before saving
+    const isValid = validateData(previewType, previewData);
+    if (!isValid) {
+      setChatHistory([
+        ...chatHistory,
+        {
+          role: "assistant",
+          content: "Please ensure all required fields are filled out correctly.",
+        },
+      ]);
+      return;
+    }
+
+    try {
+      // Prepare the new item with metadata
+      const newItem = {
+        id: Date.now().toString(),
+        user_id: user.id,
+        ...previewData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: "active",
+      };
+
+      // Insert into Supabase
+      const { error } = await supabase
+        .from(previewType)
+        .insert([newItem]);
+
+      if (error) throw error;
+
+      // Add success message to chat
+      const confirmationMessage = `I've saved the ${previewType} to your dashboard. You can access it there anytime.`;
+      setChatHistory([
+        ...chatHistory,
+        { role: "assistant", content: confirmationMessage },
+      ]);
+
+      // Reset preview state
+      setPreviewType("none");
+      setPreviewData(null);
+      setIsEditing(false);
+      setEditedData(null);
+    } catch (error) {
+      console.error("Error saving data:", error);
+      setChatHistory([
+        ...chatHistory,
+        {
+          role: "assistant",
+          content: "Sorry, there was an error saving your data. Please try again.",
+        },
+      ]);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  // Helper function to validate data before saving
+  const validateData = (type: string, data: any): boolean => {
+    switch (type) {
+      case "client":
+        return !!(data.name && data.email);
+      case "product":
+        return !!(data.name && data.price && data.type);
+      case "invoice":
+        return !!(data.client && data.items && data.items.length > 0);
+      case "report":
+        return !!(data.title && data.period && data.metrics);
+      case "chart":
+        return !!(data.title && data.type);
+      default:
+        return false;
+    }
+  };
+
+  // Helper function to generate guidance messages for editing through chat
+  const getEditGuidanceMessage = (type: string): string => {
+    switch (type) {
+      case "client":
+        return (
+          "You can edit this client by typing in the chat. For example:\n\n" +
+          '"Update the client with company name: Ampersand, email: contact@ampersand.co, phone: (555) 123-4567, address: 123 Tech Lane, San Francisco"'
+        );
+
+      case "product":
+        return (
+          "You can edit this product by typing in the chat. For example:\n\n" +
+          '"Update the product with name: Premium Package, type: service, price: 299.99, description: Comprehensive service package, unit: hour, tax rate: 8.5"'
+        );
+
+      case "invoice":
+        return (
+          "You can edit this invoice by typing in the chat. For example:\n\n" +
+          '"Update the invoice with client: Ampersand, due date: 12/31/2023, item: Web Development, qty: 40, price: 125, item: UI Design, qty: 20, price: 150"'
+        );
+
+      case "chart":
+        return (
+          "You can edit this chart by typing in the chat. For example:\n\n" +
+          '"Update the chart with title: Revenue by Quarter, type: pie, Paid: $45000, Pending: $12500, Overdue: $3200"'
+        );
+
+      case "report":
+        return (
+          "You can edit this report by typing in the chat. For example:\n\n" +
+          '"Update the report with title: Q4 Performance, period: Quarterly, summary: Strong growth in all key metrics, Total Revenue: $125,000 +15%, New Clients: 12 +20%"'
+        );
+
+      default:
+        return "You can edit this by typing your changes in the chat.";
+    }
+  };
+
+  const handleSaveEdit = () => {
+    // Update the preview data with edited data
+    setPreviewData(editedData);
+    setIsEditing(false);
+
+    // Add a message to the chat history
+    const editMessage = `I've updated the ${previewType} with your changes. Click "Confirm & Save" to save it to your dashboard.`;
+    setChatHistory([
+      ...chatHistory,
+      { role: "assistant", content: editMessage },
+    ]);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedData(null);
   };
 
   const handleSwitchToRetro = () => {
@@ -824,76 +983,6 @@ export default function AIPage() {
     }
   };
 
-  const handleEdit = () => {
-    // If using the button to edit, provide guidance in the chat about text editing
-    if (previewType !== "none" && previewData) {
-      const editGuidanceMessage = getEditGuidanceMessage(previewType);
-      setChatHistory([
-        ...chatHistory,
-        { role: "assistant", content: editGuidanceMessage },
-      ]);
-    }
-
-    setIsEditing(true);
-    setEditedData({ ...previewData });
-  };
-
-  // Helper function to generate guidance messages for editing through chat
-  const getEditGuidanceMessage = (type: string): string => {
-    switch (type) {
-      case "client":
-        return (
-          "You can edit this client by typing in the chat. For example:\n\n" +
-          '"Update the client with company name: Ampersand, email: contact@ampersand.co, phone: (555) 123-4567, address: 123 Tech Lane, San Francisco"'
-        );
-
-      case "product":
-        return (
-          "You can edit this product by typing in the chat. For example:\n\n" +
-          '"Update the product with name: Premium Package, type: service, price: 299.99, description: Comprehensive service package, unit: hour, tax rate: 8.5"'
-        );
-
-      case "invoice":
-        return (
-          "You can edit this invoice by typing in the chat. For example:\n\n" +
-          '"Update the invoice with client: Ampersand, due date: 12/31/2023, item: Web Development, qty: 40, price: 125, item: UI Design, qty: 20, price: 150"'
-        );
-
-      case "chart":
-        return (
-          "You can edit this chart by typing in the chat. For example:\n\n" +
-          '"Update the chart with title: Revenue by Quarter, type: pie, Paid: $45000, Pending: $12500, Overdue: $3200"'
-        );
-
-      case "report":
-        return (
-          "You can edit this report by typing in the chat. For example:\n\n" +
-          '"Update the report with title: Q4 Performance, period: Quarterly, summary: Strong growth in all key metrics, Total Revenue: $125,000 +15%, New Clients: 12 +20%"'
-        );
-
-      default:
-        return "You can edit this by typing your changes in the chat.";
-    }
-  };
-
-  const handleSaveEdit = () => {
-    // Update the preview data with edited data
-    setPreviewData(editedData);
-    setIsEditing(false);
-
-    // Add a message to the chat history
-    const editMessage = `I've updated the ${previewType} with your changes. Click "Confirm & Save" to save it to your dashboard.`;
-    setChatHistory([
-      ...chatHistory,
-      { role: "assistant", content: editMessage },
-    ]);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditedData(null);
-  };
-
   const handleEditChange = (field: string, value: any) => {
     setEditedData({
       ...editedData,
@@ -904,12 +993,24 @@ export default function AIPage() {
   const renderPreview = () => {
     if (previewType === "none" || !previewData) {
       return (
-        <div className="flex items-center justify-center h-full bg-muted/30 rounded-xl p-8 text-center border-2 border-dashed border-vibrant-yellow/30 hover:border-vibrant-yellow/60 transition-all duration-300 shadow-[0_0_15px_rgba(245,215,66,0.1)]">
-          <div>
-            <Sparkles className="h-12 w-12 text-vibrant-yellow mx-auto mb-4 animate-pulse-subtle" />
-            <h3 className="text-lg font-medium">AI Assistant</h3>
+        <div className="flex items-center justify-center h-full bg-muted/30 rounded-xl p-8 text-center border-2 border-dashed border-vibrant-yellow/30 hover:border-vibrant-yellow/60 transition-all duration-300 shadow-[0_0_15px_rgba(245,215,66,0.1)] relative overflow-hidden group">
+          {/* AI-themed animated background */}
+          <div className="absolute inset-0 pointer-events-none opacity-30">
+            <div className="absolute top-0 left-0 w-full h-full bg-grid-vibrant-yellow/10 bg-[size:20px_20px] animate-grid-flow"></div>
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-vibrant-yellow/20 via-transparent to-transparent"></div>
+          </div>
+          <div className="relative flex flex-col items-center justify-center text-center">
+            <Image
+              src="/images/Kashew.png"
+              alt="Kashew Logo"
+              height={31}
+              width={31}
+              className="object-contain"
+            />
+            <h3 className="text-lg font-medium mt-2">AI Assistant</h3>
             <p className="text-muted-foreground mt-2">
-              Ask me to create clients, products, invoices, or generate reports.
+              Ask me to create clients, products, invoices, or generate
+              reports.
             </p>
           </div>
         </div>
@@ -1643,32 +1744,45 @@ export default function AIPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold flex items-center">
-              <Sparkles className="h-6 w-6 text-vibrant-yellow mr-2" />
-              Kashew
+              <Image
+                src="/images/Kashew.png"
+                alt="Kashew Logo"
+                height={24}
+                width={24}
+                className="object-contain"
+              />
+              <span className="ml-2">Kashew</span>
             </h1>
+
             <p className="text-muted-foreground">
               Your intelligent business companion
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2 rounded-full border border-vibrant-yellow text-vibrant-black/80 
-            relative overflow-hidden transition-all duration-300 ease-in-out 
-            bg-gradient-to-r from-vibrant-yellow/10 to-transparent 
-            shadow-[0_0_10px_rgba(255,223,0,0.4)] 
-            before:absolute before:inset-0 before:bg-gradient-radial 
-            before:from-vibrant-yellow/10 before:via-transparent before:to-transparent 
-            before:opacity-50 before:blur-lg before:transition-opacity before:duration-500 
-            hover:bg-vibrant-yellow/20 hover:shadow-[0_0_20px_rgba(255,223,0,0.8)] 
-            hover:scale-105 hover:before:opacity-100"
-
-
-
-            onClick={handleSwitchToRetro}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Switch to Retro Mode
-          </Button>
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              className="gap-2 rounded-full border border-vibrant-yellow text-vibrant-black/80 
+              relative overflow-hidden transition-all duration-300 ease-in-out 
+              bg-gradient-to-r from-vibrant-yellow/10 to-transparent 
+              shadow-[0_0_10px_rgba(255,223,0,0.4)] 
+              before:absolute before:inset-0 before:bg-gradient-radial 
+              before:from-vibrant-yellow/10 before:via-transparent before:to-transparent 
+              before:opacity-50 before:blur-lg before:transition-opacity before:duration-500 
+              hover:bg-vibrant-yellow/20 hover:shadow-[0_0_20px_rgba(255,223,0,0.8)] 
+              hover:scale-105 hover:before:opacity-100"
+              onClick={handleSwitchToRetro}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Switch to Retro Mode
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 rounded-full"
+              onClick={handleSignOut}
+            >
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-220px)]">
@@ -1731,21 +1845,7 @@ export default function AIPage() {
           {/* Preview Section */}
           <div className="h-full flex flex-col">
             {previewType === "none" || !previewData ? (
-              <div className="flex items-center justify-center h-full bg-muted/30 rounded-xl p-8 text-center border-2 border-dashed border-vibrant-yellow/30 hover:border-vibrant-yellow/60 transition-all duration-300 shadow-[0_0_15px_rgba(245,215,66,0.1)] relative overflow-hidden group">
-                {/* AI-themed animated background */}
-                <div className="absolute inset-0 pointer-events-none opacity-30">
-                  <div className="absolute top-0 left-0 w-full h-full bg-grid-vibrant-yellow/10 bg-[size:20px_20px] animate-grid-flow"></div>
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-vibrant-yellow/20 via-transparent to-transparent"></div>
-                </div>
-                <div className="relative">
-                  <Sparkles className="h-12 w-12 text-vibrant-yellow mx-auto mb-4 animate-pulse-subtle" />
-                  <h3 className="text-lg font-medium">AI Assistant</h3>
-                  <p className="text-muted-foreground mt-2">
-                    Ask me to create clients, products, invoices, or generate
-                    reports.
-                  </p>
-                </div>
-              </div>
+              renderPreview()
             ) : (
               <div className="relative">
                 {/* AI-themed decorative elements for preview */}
@@ -1773,4 +1873,4 @@ export default function AIPage() {
       </div>
     </div>
   );
-}
+} 
