@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     "A comprehensive invoicing web application with AI-powered features",
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/images/Kashew.png' }
     ],
     apple: [
@@ -30,7 +31,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/images/Kashew.png" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/images/Kashew.png" type="image/png" />
         <link rel="apple-touch-icon" href="/images/Kashew.png" />
       </head>
       <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
@@ -7,36 +7,78 @@ import {
   FileText,
   Clock,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { invoiceService } from "@/lib/database";
+import { Invoice } from "@/lib/models";
+import { formatCurrency } from "@/lib/utils";
 
 interface AnalyticsSummaryProps {
   className?: string;
-  data?: {
-    totalRevenue: number;
-    outstandingInvoices: number;
-    paidInvoices: number;
-    overdueInvoices: number;
-  };
 }
 
-const AnalyticsSummary = ({
-  className = "",
-  data = {
-    totalRevenue: 45250.75,
-    outstandingInvoices: 12340.5,
-    paidInvoices: 32910.25,
-    overdueInvoices: 5670.25,
-  },
-}: AnalyticsSummaryProps) => {
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+const AnalyticsSummary = ({ className = "" }: AnalyticsSummaryProps) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState({
+    totalRevenue: 0,
+    outstandingInvoices: 0,
+    paidInvoices: 0,
+    overdueInvoices: 0,
+  });
+
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [user]);
+
+  const loadData = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const invoices = await invoiceService.getAll(user.id);
+      
+      // Calculate analytics
+      let totalRevenue = 0;
+      let outstandingInvoices = 0;
+      let paidInvoices = 0;
+      let overdueInvoices = 0;
+      
+      invoices.forEach((invoice: Invoice) => {
+        if (invoice.status === 'paid') {
+          totalRevenue += invoice.total;
+          paidInvoices += invoice.total;
+        } else if (invoice.status === 'pending') {
+          outstandingInvoices += invoice.total;
+        } else if (invoice.status === 'overdue') {
+          overdueInvoices += invoice.total;
+          outstandingInvoices += invoice.total;
+        }
+      });
+      
+      setAnalytics({
+        totalRevenue,
+        outstandingInvoices,
+        paidInvoices,
+        overdueInvoices,
+      });
+    } catch (error) {
+      console.error("Error loading analytics data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -53,13 +95,13 @@ const AnalyticsSummary = ({
           </div>
           <div className="flex items-center gap-1">
             <ArrowUpRight className="h-4 w-4 text-black" />
-            <span className="text-sm font-medium text-black">+12.5%</span>
+            <span className="text-sm font-medium text-black">Total</span>
           </div>
         </div>
         <div className="mt-4">
           <p className="text-sm text-black/70">Total Revenue</p>
           <h3 className="text-3xl font-bold text-black">
-            {formatCurrency(data.totalRevenue)}
+            {formatCurrency(analytics.totalRevenue)}
           </h3>
         </div>
       </div>
@@ -75,13 +117,13 @@ const AnalyticsSummary = ({
           </div>
           <div className="flex items-center gap-1">
             <ArrowUpRight className="h-4 w-4 text-black" />
-            <span className="text-sm font-medium text-black">+5.2%</span>
+            <span className="text-sm font-medium text-black">Pending</span>
           </div>
         </div>
         <div className="mt-4">
           <p className="text-sm text-black/70">Outstanding Invoices</p>
           <h3 className="text-3xl font-bold text-black">
-            {formatCurrency(data.outstandingInvoices)}
+            {formatCurrency(analytics.outstandingInvoices)}
           </h3>
         </div>
       </div>
@@ -97,13 +139,13 @@ const AnalyticsSummary = ({
           </div>
           <div className="flex items-center gap-1">
             <ArrowUpRight className="h-4 w-4 text-white" />
-            <span className="text-sm font-medium text-white">+18.3%</span>
+            <span className="text-sm font-medium text-white">Paid</span>
           </div>
         </div>
         <div className="mt-4">
           <p className="text-sm text-white/70">Paid Invoices</p>
           <h3 className="text-3xl font-bold text-white">
-            {formatCurrency(data.paidInvoices)}
+            {formatCurrency(analytics.paidInvoices)}
           </h3>
         </div>
       </div>
@@ -119,13 +161,13 @@ const AnalyticsSummary = ({
           </div>
           <div className="flex items-center gap-1">
             <ArrowDownRight className="h-4 w-4 text-red-500" />
-            <span className="text-sm font-medium text-red-500">-3.1%</span>
+            <span className="text-sm font-medium text-red-500">Overdue</span>
           </div>
         </div>
         <div className="mt-4">
           <p className="text-sm text-white/70">Overdue Invoices</p>
           <h3 className="text-3xl font-bold text-white">
-            {formatCurrency(data.overdueInvoices)}
+            {formatCurrency(analytics.overdueInvoices)}
           </h3>
         </div>
       </div>
