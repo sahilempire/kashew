@@ -11,7 +11,7 @@ import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, isConfigured } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +25,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      if (!isConfigured) {
+        throw new Error("Authentication is not properly configured. Please check your environment variables.");
+      }
+
       if (isSignUp) {
         if (!name) {
           throw new Error("Name is required");
@@ -36,7 +40,9 @@ export default function LoginPage() {
       router.push("/ai");
     } catch (err) {
       setError(
-        isSignUp
+        err instanceof Error
+          ? err.message
+          : isSignUp
           ? "Failed to create account. Please try again."
           : "Failed to sign in. Please check your credentials."
       );
@@ -65,6 +71,13 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {!isConfigured && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <strong className="font-bold">Warning!</strong>
+              <span className="block sm:inline"> Authentication is not properly configured. Please check your environment variables.</span>
+            </div>
+          )}
+
           {error && (
             <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm mb-4">
               {error}
@@ -81,7 +94,7 @@ export default function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || !isConfigured}
                 />
               </div>
             )}
@@ -95,7 +108,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !isConfigured}
               />
             </div>
 
@@ -107,14 +120,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !isConfigured}
               />
             </div>
 
             <Button
               type="submit"
               className="w-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-              disabled={isLoading}
+              disabled={isLoading || !isConfigured}
             >
               {isLoading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
             </Button>
@@ -125,7 +138,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-primary hover:underline"
-              disabled={isLoading}
+              disabled={isLoading || !isConfigured}
             >
               {isSignUp
                 ? "Already have an account? Sign in"
