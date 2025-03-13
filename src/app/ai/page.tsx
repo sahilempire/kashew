@@ -14,6 +14,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 const InvoicePreview = dynamic(
   () => import("@/components/invoices/InvoicePreview"),
@@ -41,6 +43,8 @@ export default function AIPage() {
   >("none");
   const [previewData, setPreviewData] = useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
@@ -479,12 +483,32 @@ export default function AIPage() {
   };
 
   const handleEdit = () => {
-    // In a real app, this would open an edit form
-    const editMessage = `What would you like to change about the ${previewType}?`;
+    setIsEditing(true);
+    setEditedData({...previewData});
+  };
+
+  const handleSaveEdit = () => {
+    setPreviewData(editedData);
+    setIsEditing(false);
+    
+    // Add a message to the chat history
+    const editMessage = `I've updated the ${previewType} with your changes.`;
     setChatHistory([
       ...chatHistory,
       { role: "assistant", content: editMessage },
     ]);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedData(null);
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    setEditedData({
+      ...editedData,
+      [field]: value
+    });
   };
 
   const renderPreview = () => {
@@ -623,51 +647,114 @@ export default function AIPage() {
           <Card className="modern-card overflow-hidden">
             <CardContent className="p-6">
               <h3 className="text-xl font-bold mb-4">Client Preview</h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Company Name
-                    </p>
-                    <p className="font-medium">{previewData.name}</p>
+              {isEditing && previewType === "client" ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Company Name
+                      </p>
+                      <Input 
+                        value={editedData.name} 
+                        onChange={(e) => handleEditChange('name', e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Contact Name
+                      </p>
+                      <Input 
+                        value={editedData.contactName} 
+                        onChange={(e) => handleEditChange('contactName', e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <Input 
+                        value={editedData.email} 
+                        onChange={(e) => handleEditChange('email', e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <Input 
+                        value={editedData.phone} 
+                        onChange={(e) => handleEditChange('phone', e.target.value)} 
+                      />
+                    </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      Contact Name
-                    </p>
-                    <p className="font-medium">{previewData.contactName}</p>
+                    <p className="text-sm text-muted-foreground">Address</p>
+                    <Input 
+                      value={editedData.address} 
+                      onChange={(e) => handleEditChange('address', e.target.value)} 
+                    />
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3">
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      className="rounded-full"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveEdit}
+                      className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
+                    >
+                      Save Changes
+                    </Button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Company Name
+                      </p>
+                      <p className="font-medium">{previewData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Contact Name
+                      </p>
+                      <p className="font-medium">{previewData.contactName}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium">{previewData.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium">{previewData.phone}</p>
+                    </div>
+                  </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{previewData.email}</p>
+                    <p className="text-sm text-muted-foreground">Address</p>
+                    <p className="font-medium">{previewData.address}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Phone</p>
-                    <p className="font-medium">{previewData.phone}</p>
+                  <div className="pt-4 flex justify-end gap-3">
+                    <Button
+                      onClick={handleEdit}
+                      variant="outline"
+                      className="rounded-full"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      onClick={handleConfirm}
+                      className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
+                    >
+                      Confirm & Save
+                    </Button>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="font-medium">{previewData.address}</p>
-                </div>
-                <div className="pt-4 flex justify-end gap-3">
-                  <Button
-                    onClick={handleEdit}
-                    variant="outline"
-                    className="rounded-full"
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    onClick={handleConfirm}
-                    className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
-                  >
-                    Confirm & Save
-                  </Button>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         );
@@ -679,38 +766,156 @@ export default function AIPage() {
               <h3 className="text-xl font-bold mb-4">
                 {previewData.type} Preview
               </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{previewData.name}</p>
+              {isEditing && previewType === "product" ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Name</p>
+                      <Input 
+                        value={editedData.name} 
+                        onChange={(e) => handleEditChange('name', e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Type</p>
+                      <Select 
+                        value={editedData.type}
+                        onValueChange={(value) => handleEditChange('type', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Product">Product</SelectItem>
+                          <SelectItem value="Service">Service</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Type</p>
-                    <p className="font-medium">{previewData.type}</p>
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <Textarea 
+                      value={editedData.description} 
+                      onChange={(e) => handleEditChange('description', e.target.value)} 
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Price</p>
+                      <Input 
+                        type="number"
+                        value={editedData.price} 
+                        onChange={(e) => handleEditChange('price', parseFloat(e.target.value))} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Unit</p>
+                      <Input 
+                        value={editedData.unit} 
+                        onChange={(e) => handleEditChange('unit', e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tax Rate</p>
+                      <Input 
+                        type="number"
+                        value={editedData.taxRate} 
+                        onChange={(e) => handleEditChange('taxRate', parseFloat(e.target.value))} 
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3">
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      className="rounded-full"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveEdit}
+                      className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
+                    >
+                      Save Changes
+                    </Button>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="font-medium">{previewData.description}</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Name</p>
+                      <p className="font-medium">{previewData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Type</p>
+                      <p className="font-medium">{previewData.type}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <p className="font-medium">{previewData.description}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Price</p>
+                      <p className="font-medium">
+                        ${previewData.price.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Unit</p>
+                      <p className="font-medium">{previewData.unit}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tax Rate</p>
+                      <p className="font-medium">{previewData.taxRate}%</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3">
+                    <Button
+                      onClick={handleEdit}
+                      variant="outline"
+                      className="rounded-full"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      onClick={handleConfirm}
+                      className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
+                    >
+                      Confirm & Save
+                    </Button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Price</p>
-                    <p className="font-medium">
-                      ${previewData.price.toFixed(2)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Unit</p>
-                    <p className="font-medium">{previewData.unit}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tax Rate</p>
-                    <p className="font-medium">{previewData.taxRate}%</p>
-                  </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      case "invoice":
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Invoice Preview</h3>
+              {isEditing && previewType === "invoice" ? (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleCancelEdit}
+                    variant="outline"
+                    className="rounded-full"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
+                  >
+                    Save Changes
+                  </Button>
                 </div>
-                <div className="pt-4 flex justify-end gap-3">
+              ) : (
+                <div className="flex gap-3">
                   <Button
                     onClick={handleEdit}
                     variant="outline"
@@ -725,48 +930,205 @@ export default function AIPage() {
                     Confirm & Save
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case "invoice":
-        return (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">Invoice Preview</h3>
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleEdit}
-                  variant="outline"
-                  className="rounded-full"
-                >
-                  Edit
-                </Button>
-                <Button
-                  onClick={handleConfirm}
-                  className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
-                >
-                  Confirm & Save
-                </Button>
-              </div>
+              )}
             </div>
-            <Tabs
-              value={selectedTemplate.toString()}
-              onValueChange={(v) => setSelectedTemplate(parseInt(v))}
-            >
-              <TabsList className="grid grid-cols-5 mb-4">
-                <TabsTrigger value="1">Modern</TabsTrigger>
-                <TabsTrigger value="2">Professional</TabsTrigger>
-                <TabsTrigger value="3">Minimal</TabsTrigger>
-                <TabsTrigger value="4">Creative</TabsTrigger>
-                <TabsTrigger value="5">Classic</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <InvoicePreview
-              templateId={selectedTemplate}
-              invoiceData={previewData}
-            />
+
+            {isEditing && previewType === "invoice" ? (
+              <Card className="modern-card overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-lg font-medium mb-2">Client Information</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Client Name</p>
+                          <Input 
+                            value={editedData.client.name} 
+                            onChange={(e) => {
+                              const updatedClient = {...editedData.client, name: e.target.value};
+                              handleEditChange('client', updatedClient);
+                            }} 
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Client Email</p>
+                          <Input 
+                            value={editedData.client.email} 
+                            onChange={(e) => {
+                              const updatedClient = {...editedData.client, email: e.target.value};
+                              handleEditChange('client', updatedClient);
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-lg font-medium mb-2">Invoice Items</h4>
+                      {editedData.items.map((item: any, index: number) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 mb-2">
+                          <div className="col-span-6">
+                            <Input 
+                              value={item.description} 
+                              onChange={(e) => {
+                                const updatedItems = [...editedData.items];
+                                updatedItems[index] = {...item, description: e.target.value};
+                                handleEditChange('items', updatedItems);
+                              }} 
+                              placeholder="Description"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input 
+                              type="number"
+                              value={item.quantity} 
+                              onChange={(e) => {
+                                const updatedItems = [...editedData.items];
+                                updatedItems[index] = {...item, quantity: parseInt(e.target.value)};
+                                
+                                // Recalculate totals
+                                const subtotal = updatedItems.reduce(
+                                  (sum, item) => sum + item.quantity * item.price, 0
+                                );
+                                const tax = subtotal * 0.1;
+                                const total = subtotal + tax;
+                                
+                                setEditedData({
+                                  ...editedData,
+                                  items: updatedItems,
+                                  subtotal,
+                                  tax,
+                                  total
+                                });
+                              }} 
+                              placeholder="Qty"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input 
+                              type="number"
+                              value={item.price} 
+                              onChange={(e) => {
+                                const updatedItems = [...editedData.items];
+                                updatedItems[index] = {...item, price: parseFloat(e.target.value)};
+                                
+                                // Recalculate totals
+                                const subtotal = updatedItems.reduce(
+                                  (sum, item) => sum + item.quantity * item.price, 0
+                                );
+                                const tax = subtotal * 0.1;
+                                const total = subtotal + tax;
+                                
+                                setEditedData({
+                                  ...editedData,
+                                  items: updatedItems,
+                                  subtotal,
+                                  tax,
+                                  total
+                                });
+                              }} 
+                              placeholder="Price"
+                            />
+                          </div>
+                          <div className="col-span-2 flex items-center">
+                            ${(item.quantity * item.price).toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => {
+                          const updatedItems = [...editedData.items, {
+                            description: "New Item",
+                            quantity: 1,
+                            price: 0
+                          }];
+                          handleEditChange('items', updatedItems);
+                        }}
+                      >
+                        Add Item
+                      </Button>
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>${editedData.subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between mb-2">
+                        <span>Tax (10%):</span>
+                        <span>${editedData.tax.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold">
+                        <span>Total:</span>
+                        <span>${editedData.total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm text-muted-foreground">Due Date</p>
+                      <Input 
+                        type="date"
+                        value={editedData.dueDate ? new Date(editedData.dueDate).toISOString().split('T')[0] : ''} 
+                        onChange={(e) => handleEditChange('dueDate', e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs defaultValue="preview" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                  <TabsTrigger value="template1">Template 1</TabsTrigger>
+                  <TabsTrigger value="template2">Template 2</TabsTrigger>
+                  <TabsTrigger value="template3">Template 3</TabsTrigger>
+                </TabsList>
+                <TabsContent value="preview" className="mt-0">
+                  <InvoicePreview
+                    invoice={previewData}
+                    templateId={selectedTemplate}
+                  />
+                </TabsContent>
+                <TabsContent value="template1" className="mt-0">
+                  <div
+                    className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${selectedTemplate === 1 ? "border-vibrant-yellow" : "border-transparent"}`}
+                    onClick={() => setSelectedTemplate(1)}
+                  >
+                    <InvoicePreview
+                      invoice={previewData}
+                      templateId={1}
+                      scale={0.8}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="template2" className="mt-0">
+                  <div
+                    className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${selectedTemplate === 2 ? "border-vibrant-yellow" : "border-transparent"}`}
+                    onClick={() => setSelectedTemplate(2)}
+                  >
+                    <InvoicePreview
+                      invoice={previewData}
+                      templateId={2}
+                      scale={0.8}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="template3" className="mt-0">
+                  <div
+                    className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${selectedTemplate === 3 ? "border-vibrant-yellow" : "border-transparent"}`}
+                    onClick={() => setSelectedTemplate(3)}
+                  >
+                    <InvoicePreview
+                      invoice={previewData}
+                      templateId={3}
+                      scale={0.8}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
         );
 

@@ -14,19 +14,49 @@ import {
 interface AddClientFormProps {
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
+  initialData?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    position?: string;
+    taxId?: string;
+    paymentTerms?: string;
+  };
 }
 
 const AddClientForm = ({
   onSubmit = () => {},
   onCancel = () => {},
+  initialData = {},
 }: AddClientFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would collect form data and validate
-    onSubmit({
-      name: "New Client",
-      email: "client@example.com",
-    });
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = {
+      name: formData.get('companyName') as string,
+      email: formData.get('email') as string,
+      phone: formData.get('phone') as string,
+      address: formData.get('address') as string,
+      city: formData.get('city') as string,
+      state: formData.get('state') as string,
+      zip: formData.get('zip') as string,
+      country: formData.get('country') as string,
+      contactName: `${formData.get('firstName')} ${formData.get('lastName')}`,
+      contactEmail: formData.get('contactEmail') as string,
+      contactPhone: formData.get('contactPhone') as string,
+      position: formData.get('position') as string,
+      taxId: formData.get('taxId') as string,
+      paymentTerms: formData.get('paymentTerms') as string,
+    };
+    onSubmit(data);
   };
 
   return (
@@ -35,7 +65,7 @@ const AddClientForm = ({
         <h3 className="text-lg font-medium">Company Information</h3>
         <div className="space-y-2">
           <Label htmlFor="companyName">Company Name</Label>
-          <Input id="companyName" placeholder="Enter company name" required />
+          <Input id="companyName" placeholder="Enter company name" required defaultValue={initialData.name} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -46,12 +76,13 @@ const AddClientForm = ({
               type="email"
               placeholder="company@example.com"
               required
+              defaultValue={initialData.email}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" type="tel" placeholder="(555) 123-4567" />
+            <Input id="phone" type="tel" placeholder="(555) 123-4567" defaultValue={initialData.phone} />
           </div>
         </div>
 
@@ -61,29 +92,30 @@ const AddClientForm = ({
             id="address"
             placeholder="Enter company address"
             className="resize-none h-20"
+            defaultValue={initialData.address}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="city">City</Label>
-            <Input id="city" placeholder="City" />
+            <Input id="city" placeholder="City" defaultValue={initialData.city} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="state">State/Province</Label>
-            <Input id="state" placeholder="State/Province" />
+            <Input id="state" placeholder="State/Province" defaultValue={initialData.state} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="zip">Zip/Postal Code</Label>
-            <Input id="zip" placeholder="Zip/Postal Code" />
+            <Input id="zip" placeholder="Zip/Postal Code" defaultValue={initialData.zip} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
-          <Select>
+          <Select defaultValue={initialData.country}>
             <SelectTrigger id="country">
               <SelectValue placeholder="Select country" />
             </SelectTrigger>
@@ -104,12 +136,12 @@ const AddClientForm = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" placeholder="First name" required />
+            <Input id="firstName" placeholder="First name" required defaultValue={initialData.contactName?.split(' ')[0]} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="lastName">Last Name</Label>
-            <Input id="lastName" placeholder="Last name" required />
+            <Input id="lastName" placeholder="Last name" required defaultValue={initialData.contactName?.split(' ')[1]} />
           </div>
         </div>
 
@@ -121,18 +153,19 @@ const AddClientForm = ({
               type="email"
               placeholder="contact@example.com"
               required
+              defaultValue={initialData.contactEmail}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="contactPhone">Phone</Label>
-            <Input id="contactPhone" type="tel" placeholder="(555) 123-4567" />
+            <Input id="contactPhone" type="tel" placeholder="(555) 123-4567" defaultValue={initialData.contactPhone} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="position">Position</Label>
-          <Input id="position" placeholder="Job title" />
+          <Input id="position" placeholder="Job title" defaultValue={initialData.position} />
         </div>
       </div>
 
@@ -140,12 +173,12 @@ const AddClientForm = ({
         <h3 className="text-lg font-medium">Billing Information</h3>
         <div className="space-y-2">
           <Label htmlFor="taxId">Tax ID / VAT Number</Label>
-          <Input id="taxId" placeholder="Enter tax ID or VAT number" />
+          <Input id="taxId" placeholder="Enter tax ID or VAT number" defaultValue={initialData.taxId} />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="paymentTerms">Payment Terms</Label>
-          <Select defaultValue="30">
+          <Select defaultValue={initialData.paymentTerms}>
             <SelectTrigger id="paymentTerms">
               <SelectValue placeholder="Select payment terms" />
             </SelectTrigger>
