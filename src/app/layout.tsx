@@ -1,53 +1,50 @@
-import { TempoInit } from "@/components/tempo-init";
-import type { Metadata } from "next";
+import { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Kashew - Modern Invoicing Platform",
-  description:
-    "A comprehensive invoicing web application with AI-powered features",
+  title: "Kashew - Modern Invoicing System",
+  description: "A modern invoicing system for businesses",
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/images/Kashew.png' }
+      {
+        url: "/images/Kashew.png",
+        href: "/images/Kashew.png",
+      }
     ],
+    shortcut: ["/images/Kashew.png"],
     apple: [
-      { url: '/images/Kashew.png' }
-    ]
-  }
+      { url: "/images/Kashew.png" }
+    ],
+  },
+  manifest: "/manifest.json"
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/images/Kashew.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/images/Kashew.png" />
-      </head>
-      <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />
+      <head />
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
+        <AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
             {children}
-            <TempoInit />
-          </AuthProvider>
-        </ThemeProvider>
+            <Toaster />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

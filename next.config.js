@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+    env: {
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fwgkgeexxpablhdynavt.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3Z2tnZWV4eHBhYmxoZHluYXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4Njk4MTcsImV4cCI6MjA1NzQ0NTgxN30.NSXJK3_ct7IGt3CuYVdG5wS5sZA7EW3l2-H4AepST4o'
+    },
     images: {
-        domains: ['images.unsplash.com'],
+        domains: ['fwgkgeexxpablhdynavt.supabase.co'],
     }
 };
 

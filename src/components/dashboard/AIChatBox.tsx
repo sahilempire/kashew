@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Send, Sparkles } from "lucide-react";
+import EditDataForm from "./EditDataForm";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AIChatBoxProps {
   onGenerateInvoice?: (data: any) => void;
@@ -15,6 +17,7 @@ const AIChatBox = ({
   onGenerateInvoice = () => {},
   className = "",
 }: AIChatBoxProps) => {
+  const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<
     { role: string; content: string }[]
@@ -22,9 +25,14 @@ const AIChatBox = ({
     {
       role: "system",
       content:
-        "Hello! I can help you create an invoice. Just tell me the client name, services/products, quantities, and prices.",
+        "Hello! I can help you create clients, products, or invoices. Just tell me what you'd like to create and provide the details.",
     },
   ]);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editData, setEditData] = useState<{
+    type: 'client' | 'product' | 'invoice';
+    data: any;
+  } | null>(null);
 
   const handleSendMessage = () => {
     if (!message.trim()) return;
@@ -34,85 +42,141 @@ const AIChatBox = ({
     setChatHistory(newChatHistory);
     setMessage("");
 
-    // Simulate AI response
-    setTimeout(() => {
-      let aiResponse =
-        "I'll help you create an invoice based on that information. Would you like to add more details or generate the invoice now?";
-
-      // Check if message contains enough invoice information
-      if (
-        message.toLowerCase().includes("generate") ||
-        message.toLowerCase().includes("create invoice")
-      ) {
-        aiResponse =
-          "I've generated an invoice based on your information. You can preview and edit it before sending.";
-
-        // Extract data from message (simplified example)
-        const clientName = extractClientName(message) || "New Client";
-        const items = extractItems(message) || [
-          { description: "Service", quantity: 1, price: 100 },
-        ];
-
-        // Generate invoice data
-        const invoiceData = {
-          client: {
-            name: clientName,
-            email: `${clientName.toLowerCase().replace(/\s+/g, ".")}@example.com`,
-            address: "123 Client Street",
-          },
-          items: items,
-          subtotal: items.reduce(
-            (sum, item) => sum + item.quantity * item.price,
-            0,
-          ),
-          tax:
-            items.reduce((sum, item) => sum + item.quantity * item.price, 0) *
-            0.1,
-          total:
-            items.reduce((sum, item) => sum + item.quantity * item.price, 0) *
-            1.1,
-          dueDate: new Date(
-            Date.now() + 30 * 24 * 60 * 60 * 1000,
-          ).toLocaleDateString(),
-        };
-
-        // Call the callback to generate the invoice
-        setTimeout(() => onGenerateInvoice(invoiceData), 500);
-      }
-
+    // Process the message to determine the type and extract data
+    const messageType = determineMessageType(message);
+    if (!messageType) {
       setChatHistory([
         ...newChatHistory,
-        { role: "assistant", content: aiResponse },
+        {
+          role: "assistant",
+          content: "I can help you create clients, products, or invoices. Please specify what you'd like to create.",
+        },
       ]);
-    }, 1000);
-  };
-
-  // Simple extraction functions (would be more sophisticated in a real app)
-  const extractClientName = (text: string): string | null => {
-    const clientMatch = text.match(/client(?:\s*name)?[:\s]+(\w+(?:\s+\w+)*)/i);
-    return clientMatch ? clientMatch[1] : null;
-  };
-
-  const extractItems = (
-    text: string,
-  ): { description: string; quantity: number; price: number }[] | null => {
-    // This is a very simplified extraction - a real implementation would be more robust
-    const items = [];
-
-    // Try to find product/service patterns
-    const productMatches = text.matchAll(
-      /(?:product|service|item)[:\s]+(\w+(?:\s+\w+)*)[\s,]+(\d+)[\s,]+(\d+(?:\.\d+)?)/gi,
-    );
-
-    for (const match of productMatches) {
-      items.push({
-        description: match[1],
-        quantity: parseInt(match[2], 10),
-        price: parseFloat(match[3]),
-      });
+      return;
     }
 
-    return items.length > 0 ? items : null;
+    // Extract data based on message type
+    let extractedData;
+    switch (messageType) {
+      case 'client':
+        extractedData = extractClientData(message);
+        break;
+      case 'product':
+        extractedData = extractProductData(message);
+        break;
+      case 'invoice':
+        extractedData = extractInvoiceData(message);
+        break;
+    }
+
+    // Show the edit form with extracted data
+    if (extractedData) {
+      setEditData({ type: messageType, data: extractedData });
+      setShowEditForm(true);
+      setChatHistory([
+        ...newChatHistory,
+        {
+          role: "assistant",
+          content: `I've extracted the ${messageType} information. Please review and edit if needed.`,
+        },
+      ]);
+    } else {
+      setChatHistory([
+        ...newChatHistory,
+        {
+          role: "assistant",
+          content: `I couldn't extract enough information to create a ${messageType}. Please provide more details.`,
+        },
+      ]);
+    }
+  };
+
+  const determineMessageType = (text: string): 'client' | 'product' | 'invoice' | null => {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('client') || lowerText.includes('customer')) return 'client';
+    if (lowerText.includes('product') || lowerText.includes('service')) return 'product';
+    if (lowerText.includes('invoice') || lowerText.includes('bill')) return 'invoice';
+    return null;
+  };
+
+  const extractClientData = (text: string) => {
+    const nameMatch = text.match(/name[:\s]+([^,\.]+)/i);
+    const emailMatch = text.match(/email[:\s]+([^,\.]+)/i);
+    const phoneMatch = text.match(/phone[:\s]+([^,\.]+)/i);
+    const companyMatch = text.match(/company[:\s]+([^,\.]+)/i);
+
+    if (!nameMatch) return null;
+
+    return {
+      name: nameMatch[1].trim(),
+      email: emailMatch ? emailMatch[1].trim() : '',
+      phone: phoneMatch ? phoneMatch[1].trim() : '',
+      companyName: companyMatch ? companyMatch[1].trim() : '',
+    };
+  };
+
+  const extractProductData = (text: string) => {
+    const nameMatch = text.match(/name[:\s]+([^,\.]+)/i);
+    const priceMatch = text.match(/price[:\s]+(\d+(?:\.\d+)?)/i);
+    const descriptionMatch = text.match(/description[:\s]+([^,\.]+)/i);
+    const unitMatch = text.match(/unit[:\s]+([^,\.]+)/i);
+
+    if (!nameMatch || !priceMatch) return null;
+
+    return {
+      name: nameMatch[1].trim(),
+      price: parseFloat(priceMatch[1]),
+      description: descriptionMatch ? descriptionMatch[1].trim() : '',
+      unit: unitMatch ? unitMatch[1].trim() : 'piece',
+    };
+  };
+
+  const extractInvoiceData = (text: string) => {
+    const clientMatch = text.match(/client[:\s]+([^,\.]+)/i);
+    const amountMatch = text.match(/amount[:\s]+(\d+(?:\.\d+)?)/i);
+    const dateMatch = text.match(/date[:\s]+([^,\.]+)/i);
+
+    if (!clientMatch || !amountMatch) return null;
+
+    const today = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(today.getDate() + 30);
+
+    return {
+      invoiceNumber: `INV-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+      client_id: clientMatch[1].trim(),
+      total: parseFloat(amountMatch[1]),
+      issueDate: today.toISOString().split('T')[0],
+      dueDate: dueDate.toISOString().split('T')[0],
+    };
+  };
+
+  const handleSave = (savedData: any) => {
+    setShowEditForm(false);
+    setEditData(null);
+    toast({
+      title: "Success",
+      description: "Data saved successfully!",
+    });
+    setChatHistory([
+      ...chatHistory,
+      {
+        role: "assistant",
+        content: "Great! The data has been saved. What else can I help you with?",
+      },
+    ]);
+  };
+
+  const handleCancel = () => {
+    setShowEditForm(false);
+    setEditData(null);
+    setChatHistory([
+      ...chatHistory,
+      {
+        role: "assistant",
+        content: "No problem. What else can I help you with?",
+      },
+    ]);
   };
 
   return (
@@ -120,7 +184,7 @@ const AIChatBox = ({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-vibrant-yellow" />
-          AI Invoice Assistant
+          AI Assistant
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -140,21 +204,31 @@ const AIChatBox = ({
             ))}
           </div>
 
-          <div className="flex gap-2">
-            <Input
-              placeholder="Describe invoice details (client, items, quantities, prices)..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              className="flex-1"
+          {showEditForm && editData ? (
+            <EditDataForm
+              type={editData.type}
+              initialData={editData.data}
+              onSave={handleSave}
+              onClose={handleCancel}
+              isFromAI={true}
             />
-            <Button
-              onClick={handleSendMessage}
-              className="bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Tell me what you want to create (client, product, or invoice)..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleSendMessage}
+                className="bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

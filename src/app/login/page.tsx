@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,18 +11,37 @@ import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp } = useAuth();
+  const searchParams = useSearchParams();
+  const { signIn, signUp, user } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
+
+  useEffect(() => {
+    // If user is already logged in, redirect to AI page
+    if (user) {
+      router.push("/ai");
+    }
+  }, [user, router]);
+
+  useEffect(() => {
+    // Check for email confirmation success message
+    const message = searchParams.get("message");
+    if (message === "confirmed") {
+      setError(null);
+      setShowConfirmationMessage(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+    setShowConfirmationMessage(false);
 
     try {
       if (isSignUp) {
@@ -30,10 +49,12 @@ export default function LoginPage() {
           throw new Error("Name is required");
         }
         await signUp(email, password, name);
+        setShowConfirmationMessage(true);
+        setIsSignUp(false);
       } else {
         await signIn(email, password);
+        router.push("/ai");
       }
-      router.push("/ai");
     } catch (err) {
       setError(
         err instanceof Error
@@ -70,6 +91,14 @@ export default function LoginPage() {
           {error && (
             <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm mb-4">
               {error}
+            </div>
+          )}
+
+          {showConfirmationMessage && (
+            <div className="bg-green-500/15 text-green-500 p-3 rounded-md text-sm mb-4">
+              {isSignUp 
+                ? "Please check your email to confirm your account. Once confirmed, you can sign in."
+                : "Your email has been confirmed! You can now sign in."}
             </div>
           )}
 
@@ -122,10 +151,14 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="text-center">
+          <div className="text-center mt-4">
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+                setShowConfirmationMessage(false);
+              }}
               className="text-sm text-primary hover:underline"
               disabled={isLoading}
             >

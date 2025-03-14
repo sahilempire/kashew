@@ -8,17 +8,150 @@ import {
   Report, 
   Chart 
 } from './models';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from './supabase';
 
 // Generic function to generate a unique ID
 const generateId = () => uuidv4();
 
 // Generic function to get current timestamp
 const getCurrentTimestamp = () => new Date().toISOString();
+
+// SQL Queries
+const SQL_QUERIES = {
+  // Client queries
+  CREATE_CLIENT: `
+    INSERT INTO clients (name, email, phone, address, contact_name, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *
+  `,
+  GET_CLIENTS: `
+    SELECT * FROM clients 
+    WHERE user_id = $1 
+    ORDER BY created_at DESC
+  `,
+  GET_CLIENT: `
+    SELECT * FROM clients 
+    WHERE id = $1 AND user_id = $2
+  `,
+  UPDATE_CLIENT: `
+    UPDATE clients 
+    SET name = $1, email = $2, phone = $3, address = $4, contact_name = $5
+    WHERE id = $6 AND user_id = $7
+    RETURNING *
+  `,
+  DELETE_CLIENT: `
+    DELETE FROM clients 
+    WHERE id = $1 AND user_id = $2
+  `,
+
+  // Product queries
+  CREATE_PRODUCT: `
+    INSERT INTO products (name, type, price, description, unit, tax_rate, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `,
+  GET_PRODUCTS: `
+    SELECT * FROM products 
+    WHERE user_id = $1 
+    ORDER BY created_at DESC
+  `,
+  GET_PRODUCT: `
+    SELECT * FROM products 
+    WHERE id = $1 AND user_id = $2
+  `,
+  UPDATE_PRODUCT: `
+    UPDATE products 
+    SET name = $1, type = $2, price = $3, description = $4, unit = $5, tax_rate = $6
+    WHERE id = $7 AND user_id = $8
+    RETURNING *
+  `,
+  DELETE_PRODUCT: `
+    DELETE FROM products 
+    WHERE id = $1 AND user_id = $2
+  `,
+
+  // Invoice queries
+  CREATE_INVOICE: `
+    INSERT INTO invoices (client_id, items, subtotal, tax, total, due_date, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `,
+  GET_INVOICES: `
+    SELECT i.*, c.name as client_name, c.email as client_email 
+    FROM invoices i
+    LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.user_id = $1 
+    ORDER BY i.created_at DESC
+  `,
+  GET_INVOICE: `
+    SELECT i.*, c.name as client_name, c.email as client_email 
+    FROM invoices i
+    LEFT JOIN clients c ON i.client_id = c.id
+    WHERE i.id = $1 AND i.user_id = $2
+  `,
+  UPDATE_INVOICE: `
+    UPDATE invoices 
+    SET client_id = $1, items = $2, subtotal = $3, tax = $4, total = $5, due_date = $6
+    WHERE id = $7 AND user_id = $8
+    RETURNING *
+  `,
+  DELETE_INVOICE: `
+    DELETE FROM invoices 
+    WHERE id = $1 AND user_id = $2
+  `,
+
+  // Report queries
+  CREATE_REPORT: `
+    INSERT INTO reports (title, period, summary, metrics, chart_data, user_id)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *
+  `,
+  GET_REPORTS: `
+    SELECT * FROM reports 
+    WHERE user_id = $1 
+    ORDER BY created_at DESC
+  `,
+  GET_REPORT: `
+    SELECT * FROM reports 
+    WHERE id = $1 AND user_id = $2
+  `,
+  UPDATE_REPORT: `
+    UPDATE reports 
+    SET title = $1, period = $2, summary = $3, metrics = $4, chart_data = $5
+    WHERE id = $6 AND user_id = $7
+    RETURNING *
+  `,
+  DELETE_REPORT: `
+    DELETE FROM reports 
+    WHERE id = $1 AND user_id = $2
+  `,
+
+  // Chart queries
+  CREATE_CHART: `
+    INSERT INTO charts (type, title, data, user_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *
+  `,
+  GET_CHARTS: `
+    SELECT * FROM charts 
+    WHERE user_id = $1 
+    ORDER BY created_at DESC
+  `,
+  GET_CHART: `
+    SELECT * FROM charts 
+    WHERE id = $1 AND user_id = $2
+  `,
+  UPDATE_CHART: `
+    UPDATE charts 
+    SET type = $1, title = $2, data = $3
+    WHERE id = $4 AND user_id = $5
+    RETURNING *
+  `,
+  DELETE_CHART: `
+    DELETE FROM charts 
+    WHERE id = $1 AND user_id = $2
+  `,
+};
 
 // Client CRUD operations
 export const clientService = {

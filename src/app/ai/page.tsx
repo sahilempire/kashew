@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,6 +26,24 @@ import {
   PieChart,
   BarChart3,
 } from "lucide-react";
+import { 
+  clientService, 
+  productService, 
+  invoiceService, 
+  reportService, 
+  chartService 
+} from "@/lib/database";
+import SQLEditor from "@/components/sql/SQLEditor";
+import { 
+  Client,
+  Product,
+  Invoice,
+  InvoiceItem as ModelInvoiceItem,
+  Report,
+  Chart,
+  ChartDataPoint,
+  ReportMetric
+} from "@/lib/models";
 
 const InvoicePreview = dynamic(
   () => import("@/components/invoices/InvoicePreview"),
@@ -33,6 +51,90 @@ const InvoicePreview = dynamic(
     ssr: false,
   }
 );
+
+// Add these interfaces at the top of the file after imports
+interface ClientData extends Partial<Client> {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  contactName: string;
+}
+
+interface ProductData extends Partial<Product> {
+  name: string;
+  type: "product" | "service";
+  price: number;
+  description: string;
+  unit: string;
+  taxRate: number;
+}
+
+interface InvoiceItem extends ModelInvoiceItem {
+  description: string;
+  quantity: number;
+  price: number;
+  taxRate: number;
+}
+
+interface InvoiceData extends Partial<Invoice> {
+  client: {
+    name: string;
+    email: string;
+    address: string;
+  };
+  items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  dueDate: string;
+}
+
+interface ChartData extends Partial<Chart> {
+  type: "bar" | "pie";
+  title: string;
+  data: ChartDataPoint[];
+}
+
+interface ReportData extends Partial<Report> {
+  title: string;
+  period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
+  summary: string;
+  metrics: ReportMetric[];
+  chartData: string;
+}
+
+type PreviewData = ClientData | ProductData | InvoiceData | ChartData | ReportData;
+
+// Add these type guard functions after the interfaces and before the component
+const isClientData = (data: PreviewData): data is ClientData => {
+  return 'email' in data && 'phone' in data;
+};
+
+const isProductData = (data: PreviewData): data is ProductData => {
+  return 'type' in data && 'price' in data;
+};
+
+const isInvoiceData = (data: PreviewData): data is InvoiceData => {
+  return 'items' in data && 'subtotal' in data;
+};
+
+const isChartData = (data: PreviewData): data is ChartData => {
+  return 'type' in data && 'data' in data;
+};
+
+const isReportData = (data: PreviewData): data is ReportData => {
+  return 'period' in data && 'metrics' in data;
+};
+
+// Add this helper function after the type guards
+const validatePeriod = (period: string): 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom' => {
+  const validPeriods = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'] as const;
+  const normalizedPeriod = period.toLowerCase().trim();
+  return validPeriods.includes(normalizedPeriod as any) 
+    ? normalizedPeriod as typeof validPeriods[number]
+    : 'custom';
+};
 
 export default function AIPage() {
   const router = useRouter();
@@ -51,10 +153,10 @@ export default function AIPage() {
   const [previewType, setPreviewType] = useState<
     "none" | "client" | "product" | "invoice" | "report" | "chart"
   >("none");
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState<any>(null);
+  const [editedData, setEditedData] = useState<PreviewData | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -121,13 +223,13 @@ export default function AIPage() {
             /(?:contact|person)[:\s]+([\w\s]+)[,\.\n]?/i
           );
 
-          // Update only the fields mentioned in the message
-          if (nameMatch) updatedData.name = nameMatch[1].trim();
-          if (emailMatch) updatedData.email = emailMatch[1].trim();
-          if (phoneMatch) updatedData.phone = phoneMatch[1].trim();
-          if (addressMatch) updatedData.address = addressMatch[1].trim();
-          if (contactNameMatch)
-            updatedData.contactName = contactNameMatch[1].trim();
+          if (isClientData(updatedData)) {
+            if (nameMatch) updatedData.name = nameMatch[1].trim();
+            if (emailMatch) updatedData.email = emailMatch[1].trim();
+            if (phoneMatch) updatedData.phone = phoneMatch[1].trim();
+            if (addressMatch) updatedData.address = addressMatch[1].trim();
+            if (contactNameMatch) updatedData.contactName = contactNameMatch[1].trim();
+          }
 
           newPreviewData = updatedData;
           break;
@@ -147,18 +249,17 @@ export default function AIPage() {
             /(?:tax|rate)[:\s]+(\d+(?:\.\d+)?)[,\.\n%]?/i
           );
 
-          // Update only the fields mentioned in the message
-          if (productNameMatch) updatedData.name = productNameMatch[1].trim();
-          if (typeMatch) {
-            const type = typeMatch[1].trim().toLowerCase();
-            updatedData.type = type.includes("service") ? "Service" : "Product";
+          if (isProductData(updatedData)) {
+            if (productNameMatch) updatedData.name = productNameMatch[1].trim();
+            if (typeMatch) {
+              const type = typeMatch[1].trim().toLowerCase();
+              updatedData.type = type.includes("service") ? "service" : "product";
+            }
+            if (priceMatch) updatedData.price = parseFloat(priceMatch[1].replace("$", ""));
+            if (descriptionMatch) updatedData.description = descriptionMatch[1].trim();
+            if (unitMatch) updatedData.unit = unitMatch[1].trim();
+            if (taxRateMatch) updatedData.taxRate = parseFloat(taxRateMatch[1]);
           }
-          if (priceMatch)
-            updatedData.price = parseFloat(priceMatch[1].replace("$", ""));
-          if (descriptionMatch)
-            updatedData.description = descriptionMatch[1].trim();
-          if (unitMatch) updatedData.unit = unitMatch[1].trim();
-          if (taxRateMatch) updatedData.taxRate = parseFloat(taxRateMatch[1]);
 
           newPreviewData = updatedData;
           break;
@@ -175,79 +276,80 @@ export default function AIPage() {
             /(?:due|date)[:\s]+(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})[,\.\n]?/i
           );
 
-          // Update client information if mentioned
-          if (clientNameMatch || clientEmailMatch) {
-            const updatedClient = { ...updatedData.client };
-            if (clientNameMatch) updatedClient.name = clientNameMatch[1].trim();
-            if (clientEmailMatch)
-              updatedClient.email = clientEmailMatch[1].trim();
-            updatedData.client = updatedClient;
-          }
+          if (isInvoiceData(updatedData)) {
+            if (clientNameMatch || clientEmailMatch) {
+              const updatedClient = { ...updatedData.client };
+              if (clientNameMatch) updatedClient.name = clientNameMatch[1].trim();
+              if (clientEmailMatch) updatedClient.email = clientEmailMatch[1].trim();
+              updatedData.client = updatedClient;
+            }
+            if (dueDateMatch) updatedData.dueDate = dueDateMatch[1].trim();
 
-          // Update due date if mentioned
-          if (dueDateMatch) updatedData.dueDate = dueDateMatch[1].trim();
-
-          // Check for item updates or additions
-          const itemMatches = message.matchAll(
-            /item[:\s]+([\w\s]+)[\s,]+(?:qty|quantity)?[:\s]*(\d+)[\s,]+(?:price)?[:\s]*\$?(\d+(?:\.\d+)?)/gi
-          );
-
-          const itemsArray = Array.from(itemMatches);
-          if (itemsArray.length > 0) {
-            // If specific items are mentioned, update or add them
-            const updatedItems = [...updatedData.items];
-
-            itemsArray.forEach((match, index) => {
-              const description = match[1].trim();
-              const quantity = parseInt(match[2], 10);
-              const price = parseFloat(match[3]);
-
-              // Try to find an existing item with similar description
-              const existingItemIndex = updatedItems.findIndex(
-                (item) =>
-                  item.description
-                    .toLowerCase()
-                    .includes(description.toLowerCase()) ||
-                  description
-                    .toLowerCase()
-                    .includes(item.description.toLowerCase())
-              );
-
-              if (existingItemIndex !== -1) {
-                // Update existing item
-                updatedItems[existingItemIndex] = {
-                  description,
-                  quantity,
-                  price,
-                };
-              } else if (index < updatedItems.length) {
-                // Update item at current index
-                updatedItems[index] = {
-                  description,
-                  quantity,
-                  price,
-                };
-              } else {
-                // Add new item
-                updatedItems.push({
-                  description,
-                  quantity,
-                  price,
-                });
-              }
-            });
-
-            // Recalculate totals
-            const subtotal = updatedItems.reduce(
-              (sum, item) => sum + item.quantity * item.price,
-              0
+            // Check for item updates or additions
+            const itemMatches = message.matchAll(
+              /item[:\s]+([\w\s]+)[\s,]+(?:qty|quantity)?[:\s]*(\d+)[\s,]+(?:price)?[:\s]*\$?(\d+(?:\.\d+)?)/gi
             );
-            const tax = subtotal * 0.1; // 10% tax
 
-            updatedData.items = updatedItems;
-            updatedData.subtotal = subtotal;
-            updatedData.tax = tax;
-            updatedData.total = subtotal + tax;
+            const itemsArray = Array.from(itemMatches);
+            if (itemsArray.length > 0) {
+              // If specific items are mentioned, update or add them
+              const updatedItems = [...updatedData.items];
+
+              itemsArray.forEach((match, index) => {
+                const description = match[1].trim();
+                const quantity = parseInt(match[2], 10);
+                const price = parseFloat(match[3]);
+
+                // Try to find an existing item with similar description
+                const existingItemIndex = updatedItems.findIndex(
+                  (item) =>
+                    item.description
+                      .toLowerCase()
+                      .includes(description.toLowerCase()) ||
+                    description
+                      .toLowerCase()
+                      .includes(item.description.toLowerCase())
+                );
+
+                if (existingItemIndex !== -1) {
+                  // Update existing item
+                  updatedItems[existingItemIndex] = {
+                    description,
+                    quantity,
+                    price,
+                    taxRate: updatedItems[existingItemIndex].taxRate,
+                  };
+                } else if (index < updatedItems.length) {
+                  // Update item at current index
+                  updatedItems[index] = {
+                    description,
+                    quantity,
+                    price,
+                    taxRate: updatedItems[index].taxRate,
+                  };
+                } else {
+                  // Add new item
+                  updatedItems.push({
+                    description,
+                    quantity,
+                    price,
+                    taxRate: updatedItems[index].taxRate,
+                  });
+                }
+              });
+
+              // Recalculate totals
+              const subtotal = updatedItems.reduce(
+                (sum, item) => sum + item.quantity * item.price,
+                0
+              );
+              const tax = subtotal * 0.1; // 10% tax
+
+              updatedData.items = updatedItems;
+              updatedData.subtotal = subtotal;
+              updatedData.tax = tax;
+              updatedData.total = subtotal + tax;
+            }
           }
 
           newPreviewData = updatedData;
@@ -262,53 +364,51 @@ export default function AIPage() {
             /(?:type|chart)[:\s]+([\w\s]+)[,\.\n]?/i
           );
 
-          // Update chart title if mentioned
-          if (chartTitleMatch) updatedData.title = chartTitleMatch[1].trim();
+          if (isChartData(updatedData)) {
+            if (chartTitleMatch) updatedData.title = chartTitleMatch[1].trim();
+            if (chartTypeMatch) {
+              const type = chartTypeMatch[1].trim().toLowerCase();
+              updatedData.type = type.includes("pie") ? "pie" : "bar";
+            }
+            // Check for data updates
+            const dataMatches = message.matchAll(
+              /([\w\s]+)[:\s]+\$?(\d+(?:\.\d+)?)[,\.\n]?/gi
+            );
 
-          // Update chart type if mentioned
-          if (chartTypeMatch) {
-            const type = chartTypeMatch[1].trim().toLowerCase();
-            updatedData.type = type.includes("pie") ? "pie" : "bar";
-          }
+            const dataArray = Array.from(dataMatches);
+            if (dataArray.length > 0) {
+              const updatedChartData = [...updatedData.data];
 
-          // Check for data updates
-          const dataMatches = message.matchAll(
-            /([\w\s]+)[:\s]+\$?(\d+(?:\.\d+)?)[,\.\n]?/gi
-          );
+              dataArray.forEach((match, index) => {
+                const label = match[1].trim();
+                const value = parseFloat(match[2]);
 
-          const dataArray = Array.from(dataMatches);
-          if (dataArray.length > 0) {
-            const updatedChartData = [...updatedData.data];
+                // Try to find an existing data point with similar label
+                const existingDataIndex = updatedChartData.findIndex(
+                  (data) =>
+                    data.label.toLowerCase().includes(label.toLowerCase()) ||
+                    label.toLowerCase().includes(data.label.toLowerCase())
+                );
 
-            dataArray.forEach((match, index) => {
-              const label = match[1].trim();
-              const value = parseFloat(match[2]);
+                if (existingDataIndex !== -1) {
+                  // Update existing data point
+                  updatedChartData[existingDataIndex] = {
+                    ...updatedChartData[existingDataIndex],
+                    label,
+                    value,
+                  };
+                } else if (index < updatedChartData.length) {
+                  // Update data point at current index
+                  updatedChartData[index] = {
+                    ...updatedChartData[index],
+                    label,
+                    value,
+                  };
+                }
+              });
 
-              // Try to find an existing data point with similar label
-              const existingDataIndex = updatedChartData.findIndex(
-                (data) =>
-                  data.label.toLowerCase().includes(label.toLowerCase()) ||
-                  label.toLowerCase().includes(data.label.toLowerCase())
-              );
-
-              if (existingDataIndex !== -1) {
-                // Update existing data point
-                updatedChartData[existingDataIndex] = {
-                  ...updatedChartData[existingDataIndex],
-                  label,
-                  value,
-                };
-              } else if (index < updatedChartData.length) {
-                // Update data point at current index
-                updatedChartData[index] = {
-                  ...updatedChartData[index],
-                  label,
-                  value,
-                };
-              }
-            });
-
-            updatedData.data = updatedChartData;
+              updatedData.data = updatedChartData;
+            }
           }
 
           newPreviewData = updatedData;
@@ -324,50 +424,50 @@ export default function AIPage() {
             /summary[:\s]+([\w\s,\.]+)[,\.\n]?/i
           );
 
-          // Update report fields if mentioned
-          if (reportTitleMatch) updatedData.title = reportTitleMatch[1].trim();
-          if (periodMatch) updatedData.period = periodMatch[1].trim();
-          if (summaryMatch) updatedData.summary = summaryMatch[1].trim();
+          if (isReportData(updatedData)) {
+            if (reportTitleMatch) updatedData.title = reportTitleMatch[1].trim();
+            if (periodMatch) updatedData.period = validatePeriod(periodMatch[1]);
+            if (summaryMatch) updatedData.summary = summaryMatch[1].trim();
 
-          // Check for metric updates
-          const metricMatches = message.matchAll(
-            /([\w\s]+)[:\s]+(\$?[\d,\.]+)(?:[,\s]+([+\-][\d\.]+%?))?/gi
-          );
-
-          const metricsArray = Array.from(metricMatches);
-          if (metricsArray.length > 0) {
+            // Check for metric updates
+            const metricRegex = /([\w\s]+)[:\s]+(\$?[\d,\.]+)(?:[,\s]+([+\-][\d\.]+%?))?/gi;
+            let match;
             const updatedMetrics = [...updatedData.metrics];
+            let index = 0;
 
-            metricsArray.forEach((match, index) => {
-              const name = match[1].trim();
-              const value = match[2].trim();
-              const change = match[3] ? match[3].trim() : "";
+            while ((match = metricRegex.exec(message)) !== null) {
+              const [_, label, valueStr, changeStr] = match;
+              if (label && valueStr) {
+                const value = parseFloat(valueStr.replace(/[$,]/g, ''));
+                const change = changeStr || '';
+                const changeType = change.startsWith('+') ? 'increase' : change.startsWith('-') ? 'decrease' : 'neutral';
 
-              // Try to find an existing metric with similar name
-              const existingMetricIndex = updatedMetrics.findIndex(
-                (metric) =>
-                  metric.name.toLowerCase().includes(name.toLowerCase()) ||
-                  name.toLowerCase().includes(metric.name.toLowerCase())
-              );
-
-              if (existingMetricIndex !== -1) {
-                // Update existing metric
-                updatedMetrics[existingMetricIndex] = {
-                  name,
-                  value,
-                  change: change || updatedMetrics[existingMetricIndex].change,
-                };
-              } else if (index < updatedMetrics.length) {
-                // Update metric at current index
-                updatedMetrics[index] = {
-                  name,
-                  value,
-                  change: change || "+0%",
-                };
+                if (index === updatedMetrics.length) {
+                  updatedMetrics.push({
+                    label: label.trim(),
+                    value,
+                    change,
+                    changeType
+                  });
+                } else if (index < updatedMetrics.length) {
+                  updatedMetrics[index] = {
+                    ...updatedMetrics[index],
+                    label: label.trim(),
+                    value,
+                    change,
+                    changeType
+                  };
+                }
+                index++;
               }
-            });
+            }
 
-            updatedData.metrics = updatedMetrics;
+            if (updatedMetrics.length > 0) {
+              updatedData = {
+                ...updatedData,
+                metrics: updatedMetrics
+              };
+            }
           }
 
           newPreviewData = updatedData;
@@ -423,7 +523,7 @@ export default function AIPage() {
           : isService
             ? "New Service"
             : "New Product",
-        type: isService ? "Service" : "Product",
+        type: isService ? "service" : "product",
         price: priceMatch ? parseFloat(priceMatch[1].replace("$", "")) : 99.99,
         description: descriptionMatch
           ? descriptionMatch[1].trim()
@@ -456,6 +556,7 @@ export default function AIPage() {
           description: match[1].trim(),
           quantity: parseInt(match[2], 10),
           price: parseFloat(match[3]),
+          taxRate: 10,
         });
       }
 
@@ -465,6 +566,7 @@ export default function AIPage() {
           description: "Professional Services",
           quantity: 1,
           price: 100,
+          taxRate: 10,
         });
       }
 
@@ -501,7 +603,7 @@ export default function AIPage() {
 
       // Determine chart type
       const isPieChart = lowerMessage.includes("pie");
-      const chartType = isPieChart ? "pie" : "bar";
+      const chartType = isPieChart ? "pie" as const : "bar" as const;
 
       // Determine data to visualize
       const showPaid = lowerMessage.includes("paid");
@@ -513,20 +615,20 @@ export default function AIPage() {
       const showAll = !showPaid && !showOverdue && !showPending;
 
       // Create chart data
-      const chartData = {
+      const chartData: ChartData = {
         type: chartType,
         title: `Invoice ${chartType === "pie" ? "Distribution" : "Summary"}`,
         data: [
-          showPaid || showAll
-            ? { label: "Paid", value: 32910, color: "#1e9f6e" }
-            : null,
-          showPending || showAll
-            ? { label: "Pending", value: 12340, color: "#f5d742" }
-            : null,
-          showOverdue || showAll
-            ? { label: "Overdue", value: 5670, color: "#f472b6" }
-            : null,
-        ].filter(Boolean),
+          { label: "Paid", value: 32910, color: "#1e9f6e" },
+          { label: "Pending", value: 12340, color: "#f5d742" },
+          { label: "Overdue", value: 5670, color: "#f472b6" }
+        ].filter((item, index) => {
+          if (showAll) return true;
+          if (index === 0 && showPaid) return true;
+          if (index === 1 && showPending) return true;
+          if (index === 2 && showOverdue) return true;
+          return false;
+        })
       };
 
       newPreviewData = chartData;
@@ -549,24 +651,26 @@ export default function AIPage() {
             ? "invoices"
             : "general";
 
+      let period = "custom";
+      if (lowerMessage.includes("month")) period = "monthly";
+      else if (lowerMessage.includes("year")) period = "yearly";
+      else if (lowerMessage.includes("week")) period = "weekly";
+      else if (lowerMessage.includes("quarter")) period = "quarterly";
+      else if (lowerMessage.includes("day")) period = "daily";
+
+      const defaultMetrics: ReportMetric[] = [
+        { label: "Total Revenue", value: 45250, change: "+12.5%", changeType: "increase" as const },
+        { label: "Average Invoice", value: 2850, change: "+5.2%", changeType: "increase" as const },
+        { label: "Active Clients", value: 18, change: "+4", changeType: "increase" as const },
+        { label: "Outstanding Invoices", value: 12340, change: "-3.1%", changeType: "decrease" as const }
+      ];
+
       newPreviewData = {
         title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
-        period: lowerMessage.includes("month")
-          ? "Monthly"
-          : lowerMessage.includes("year")
-            ? "Yearly"
-            : lowerMessage.includes("week")
-              ? "Weekly"
-              : "Custom",
-        summary:
-          "This is an AI-generated report summary based on your request.",
-        metrics: [
-          { name: "Total Revenue", value: "$45,250", change: "+12.5%" },
-          { name: "Average Invoice", value: "$2,850", change: "+5.2%" },
-          { name: "Active Clients", value: "18", change: "+4" },
-          { name: "Outstanding Invoices", value: "$12,340", change: "-3.1%" },
-        ],
-        chartData: "Chart visualization would appear here",
+        period: validatePeriod(period),
+        summary: "This is an AI-generated report summary based on your request.",
+        metrics: [...defaultMetrics],
+        chartData: "Chart visualization would appear here"
       };
     } else {
       aiResponse =
@@ -591,117 +695,170 @@ export default function AIPage() {
 
   const handleEdit = () => {
     if (previewType !== "none" && previewData) {
+      setIsEditing(true);
+      setEditedData({ ...previewData });
+      
       // Add guidance message to chat
       const editGuidanceMessage = getEditGuidanceMessage(previewType);
       setChatHistory([
         ...chatHistory,
         { role: "assistant", content: editGuidanceMessage },
       ]);
-
-      // Initialize edited data with proper type checking
-      let initialEditedData = { ...previewData };
-
-      // Add specific initializations based on content type
-      switch (previewType) {
-        case "client":
-          initialEditedData = {
-            ...initialEditedData,
-            name: previewData.name || "",
-            contactName: previewData.contactName || "",
-            email: previewData.email || "",
-            phone: previewData.phone || "",
-            address: previewData.address || "",
-          };
-          break;
-        case "product":
-          initialEditedData = {
-            ...initialEditedData,
-            name: previewData.name || "",
-            type: previewData.type || "Product",
-            description: previewData.description || "",
-            price: previewData.price || 0,
-            unit: previewData.unit || "",
-            taxRate: previewData.taxRate || 0,
-          };
-          break;
-        case "invoice":
-          initialEditedData = {
-            ...initialEditedData,
-            client: previewData.client || { name: "" },
-            dueDate: previewData.dueDate || "",
-            items: previewData.items || [],
-            subtotal: previewData.subtotal || 0,
-            tax: previewData.tax || 0,
-            total: previewData.total || 0,
-          };
-          break;
-        case "report":
-        case "chart":
-          initialEditedData = { ...previewData };
-          break;
-      }
-
-      setIsEditing(true);
-      setEditedData(initialEditedData);
     }
   };
 
-  const handleConfirm = async () => {
-    if (!previewType || !previewData || !user) {
-      console.error("No data to save or user not authenticated");
-      return;
-    }
+  const handleSaveToSupabase = async () => {
+    if (!user || !previewType || !previewData) return;
 
-    // Validate data before saving
-    const isValid = validateData(previewType, previewData);
-    if (!isValid) {
+    try {
+      let savedData;
+      switch (previewType) {
+        case "client":
+          if (isClientData(previewData)) {
+            savedData = await clientService.create(user.id, {
+              ...previewData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "product":
+          if (isProductData(previewData)) {
+            savedData = await productService.create(user.id, {
+              ...previewData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "invoice":
+          if (isInvoiceData(previewData)) {
+            savedData = await invoiceService.create(user.id, {
+              ...previewData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "report":
+          if (isReportData(previewData)) {
+            savedData = await reportService.create(user.id, {
+              ...previewData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "chart":
+          if (isChartData(previewData)) {
+            savedData = await chartService.create(user.id, {
+              ...previewData,
+              user_id: user.id
+            });
+          }
+          break;
+      }
+
+      if (!savedData) {
+        throw new Error("Failed to save data");
+      }
+
+      // Add success message to chat
       setChatHistory([
         ...chatHistory,
         {
           role: "assistant",
-          content: "Please ensure all required fields are filled out correctly.",
+          content: `Successfully saved the ${previewType} to your dashboard! ID: ${savedData.id}`,
         },
       ]);
-      return;
-    }
 
-    try {
-      // Prepare the new item with metadata
-      const newItem = {
-        id: Date.now().toString(),
-        user_id: user.id,
-        ...previewData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: "active",
-      };
-
-      // Insert into Supabase
-      const { error } = await supabase
-        .from(previewType)
-        .insert([newItem]);
-
-      if (error) throw error;
-
-      // Add success message to chat
-      const confirmationMessage = `I've saved the ${previewType} to your dashboard. You can access it there anytime.`;
-      setChatHistory([
-        ...chatHistory,
-        { role: "assistant", content: confirmationMessage },
-      ]);
-
-      // Reset preview state
+      // Clear preview
       setPreviewType("none");
       setPreviewData(null);
-      setIsEditing(false);
-      setEditedData(null);
     } catch (error) {
       console.error("Error saving data:", error);
       setChatHistory([
         ...chatHistory,
         {
           role: "assistant",
-          content: "Sorry, there was an error saving your data. Please try again.",
+          content: `Error saving the ${previewType}. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ]);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!user || !editedData) return;
+    
+    try {
+      let savedData;
+      // Save to Supabase
+      switch (previewType) {
+        case "client":
+          if (isClientData(editedData)) {
+            savedData = await clientService.create(user.id, {
+              ...editedData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "product":
+          if (isProductData(editedData)) {
+            savedData = await productService.create(user.id, {
+              ...editedData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "invoice":
+          if (isInvoiceData(editedData)) {
+            savedData = await invoiceService.create(user.id, {
+              ...editedData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "report":
+          if (isReportData(editedData)) {
+            savedData = await reportService.create(user.id, {
+              ...editedData,
+              user_id: user.id
+            });
+          }
+          break;
+        case "chart":
+          if (isChartData(editedData)) {
+            savedData = await chartService.create(user.id, {
+              ...editedData,
+              user_id: user.id
+            });
+          }
+          break;
+      }
+
+      if (!savedData) {
+        throw new Error("Failed to save edited data");
+      }
+
+      setPreviewData(editedData);
+      setIsEditing(false);
+
+      // Add success message
+      setChatHistory([
+        ...chatHistory,
+        {
+          role: "assistant",
+          content: `Successfully saved the edited ${previewType} to your dashboard! ID: ${savedData.id}`,
+        },
+      ]);
+
+      // Clear states
+      setPreviewType("none");
+      setPreviewData(null);
+      setEditedData(null);
+    } catch (error) {
+      console.error("Error saving edited data:", error);
+      setChatHistory([
+        ...chatHistory,
+        {
+          role: "assistant",
+          content: `Error saving the edited ${previewType}. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         },
       ]);
     }
@@ -772,19 +929,6 @@ export default function AIPage() {
     }
   };
 
-  const handleSaveEdit = () => {
-    // Update the preview data with edited data
-    setPreviewData(editedData);
-    setIsEditing(false);
-
-    // Add a message to the chat history
-    const editMessage = `I've updated the ${previewType} with your changes. Click "Confirm & Save" to save it to your dashboard.`;
-    setChatHistory([
-      ...chatHistory,
-      { role: "assistant", content: editMessage },
-    ]);
-  };
-
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditedData(null);
@@ -812,7 +956,7 @@ export default function AIPage() {
 
       // Determine chart type
       const isPieChart = lowerMessage.includes("pie");
-      const chartType = isPieChart ? "pie" : "bar";
+      const chartType = isPieChart ? "pie" as const : "bar" as const;
 
       // Determine data to visualize
       const showPaid = lowerMessage.includes("paid");
@@ -824,20 +968,20 @@ export default function AIPage() {
       const showAll = !showPaid && !showOverdue && !showPending;
 
       // Create chart data
-      const chartData = {
+      const chartData: ChartData = {
         type: chartType,
         title: `Invoice ${chartType === "pie" ? "Distribution" : "Summary"}`,
         data: [
-          showPaid || showAll
-            ? { label: "Paid", value: 32910, color: "#1e9f6e" }
-            : null,
-          showPending || showAll
-            ? { label: "Pending", value: 12340, color: "#f5d742" }
-            : null,
-          showOverdue || showAll
-            ? { label: "Overdue", value: 5670, color: "#f472b6" }
-            : null,
-        ].filter(Boolean),
+          { label: "Paid", value: 32910, color: "#1e9f6e" },
+          { label: "Pending", value: 12340, color: "#f5d742" },
+          { label: "Overdue", value: 5670, color: "#f472b6" }
+        ].filter((item, index) => {
+          if (showAll) return true;
+          if (index === 0 && showPaid) return true;
+          if (index === 1 && showPending) return true;
+          if (index === 2 && showOverdue) return true;
+          return false;
+        })
       };
 
       setPreviewData(chartData);
@@ -881,7 +1025,7 @@ export default function AIPage() {
           : isService
             ? "New Service"
             : "New Product",
-        type: isService ? "Service" : "Product",
+        type: isService ? "service" : "product",
         price: priceMatch ? parseFloat(priceMatch[1].replace("$", "")) : 99.99,
         description: descriptionMatch
           ? descriptionMatch[1].trim()
@@ -908,6 +1052,7 @@ export default function AIPage() {
           description: match[1].trim(),
           quantity: parseInt(match[2], 10),
           price: parseFloat(match[3]),
+          taxRate: 10,
         });
       }
 
@@ -917,6 +1062,7 @@ export default function AIPage() {
           description: "Professional Services",
           quantity: 1,
           price: 100,
+          taxRate: 10,
         });
       }
 
@@ -957,24 +1103,26 @@ export default function AIPage() {
             ? "invoices"
             : "general";
 
+      let period = "custom";
+      if (lowerMessage.includes("month")) period = "monthly";
+      else if (lowerMessage.includes("year")) period = "yearly";
+      else if (lowerMessage.includes("week")) period = "weekly";
+      else if (lowerMessage.includes("quarter")) period = "quarterly";
+      else if (lowerMessage.includes("day")) period = "daily";
+
+      const defaultMetrics: ReportMetric[] = [
+        { label: "Total Revenue", value: 45250, change: "+12.5%", changeType: "increase" as const },
+        { label: "Average Invoice", value: 2850, change: "+5.2%", changeType: "increase" as const },
+        { label: "Active Clients", value: 18, change: "+4", changeType: "increase" as const },
+        { label: "Outstanding Invoices", value: 12340, change: "-3.1%", changeType: "decrease" as const }
+      ];
+
       setPreviewData({
         title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
-        period: lowerMessage.includes("month")
-          ? "Monthly"
-          : lowerMessage.includes("year")
-            ? "Yearly"
-            : lowerMessage.includes("week")
-              ? "Weekly"
-              : "Custom",
-        summary:
-          "This is an AI-generated report summary based on your request.",
-        metrics: [
-          { name: "Total Revenue", value: "$45,250", change: "+12.5%" },
-          { name: "Average Invoice", value: "$2,850", change: "+5.2%" },
-          { name: "Active Clients", value: "18", change: "+4" },
-          { name: "Outstanding Invoices", value: "$12,340", change: "-3.1%" },
-        ],
-        chartData: "Chart visualization would appear here",
+        period: validatePeriod(period),
+        summary: "This is an AI-generated report summary based on your request.",
+        metrics: [...defaultMetrics],
+        chartData: "Chart visualization would appear here"
       });
     } else if (newMessage.trim() === "") {
       // Clear preview if message is empty
@@ -984,48 +1132,126 @@ export default function AIPage() {
   };
 
   const handleEditChange = (field: string, value: any) => {
-    setEditedData({
-      ...editedData,
-      [field]: value,
+    setEditedData((prev: PreviewData | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [field]: value,
+      };
     });
   };
 
-  const renderPreview = () => {
-    if (previewType === "none" || !previewData) {
-      return (
-        <div className="flex items-center justify-center h-full bg-muted/30 rounded-xl p-8 text-center border-2 border-dashed border-vibrant-yellow/30 hover:border-vibrant-yellow/60 transition-all duration-300 shadow-[0_0_15px_rgba(245,215,66,0.1)] relative overflow-hidden group">
-          {/* AI-themed animated background */}
-          <div className="absolute inset-0 pointer-events-none opacity-30">
-            <div className="absolute top-0 left-0 w-full h-full bg-grid-vibrant-yellow/10 bg-[size:20px_20px] animate-grid-flow"></div>
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-vibrant-yellow/20 via-transparent to-transparent"></div>
-          </div>
-          <div className="relative flex flex-col items-center justify-center text-center">
-            <Image
-              src="/images/Kashew.png"
-              alt="Kashew Logo"
-              height={31}
-              width={31}
-              className="object-contain"
-            />
-            <h3 className="text-lg font-medium mt-2">AI Assistant</h3>
-            <p className="text-muted-foreground mt-2">
-              Ask me to create clients, products, invoices, or generate
-              reports.
-            </p>
-          </div>
-        </div>
-      );
+  const getDefaultQuery = (type: string, data: any) => {
+    switch (type) {
+      case "client":
+        return `
+-- Create a new client
+INSERT INTO clients (name, email, phone, address, contact_name, user_id)
+VALUES (
+  '${data.name}',
+  '${data.email}',
+  '${data.phone}',
+  '${data.address}',
+  '${data.contactName}',
+  '${user?.id}'
+);
+
+-- Get all clients for current user
+SELECT * FROM clients WHERE user_id = '${user?.id}';
+        `.trim();
+
+      case "product":
+        return `
+-- Create a new product
+INSERT INTO products (name, type, price, description, unit, tax_rate, user_id)
+VALUES (
+  '${data.name}',
+  '${data.type}',
+  ${data.price},
+  '${data.description}',
+  '${data.unit}',
+  ${data.taxRate},
+  '${user?.id}'
+);
+
+-- Get all products for current user
+SELECT * FROM products WHERE user_id = '${user?.id}';
+        `.trim();
+
+      case "invoice":
+        return `
+-- Create a new invoice
+INSERT INTO invoices (client_id, items, subtotal, tax, total, due_date, user_id)
+VALUES (
+  '${data.client.id}',
+  '${JSON.stringify(data.items)}',
+  ${data.subtotal},
+  ${data.tax},
+  ${data.total},
+  '${data.dueDate}',
+  '${user?.id}'
+);
+
+-- Get all invoices with client details for current user
+SELECT i.*, c.name as client_name, c.email as client_email 
+FROM invoices i
+LEFT JOIN clients c ON i.client_id = c.id
+WHERE i.user_id = '${user?.id}';
+        `.trim();
+
+      case "report":
+        return `
+-- Create a new report
+INSERT INTO reports (title, period, summary, metrics, chart_data, user_id)
+VALUES (
+  '${data.title}',
+  '${data.period}',
+  '${data.summary}',
+  '${JSON.stringify(data.metrics)}',
+  '${data.chartData}',
+  '${user?.id}'
+);
+
+-- Get all reports for current user
+SELECT * FROM reports WHERE user_id = '${user?.id}';
+        `.trim();
+
+      case "chart":
+        return `
+-- Create a new chart
+INSERT INTO charts (type, title, data, user_id)
+VALUES (
+  '${data.type}',
+  '${data.title}',
+  '${JSON.stringify(data.data)}',
+  '${user?.id}'
+);
+
+-- Get all charts for current user
+SELECT * FROM charts WHERE user_id = '${user?.id}';
+        `.trim();
+
+      default:
+        return "";
     }
+  };
+
+  const renderPreview = () => {
+    if (!previewData) return null;
 
     switch (previewType) {
-      case "chart":
+      case "client":
         return (
           <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold">{previewData.title}</h3>
-                  <p className="text-muted-foreground">Custom visualization</p>
+                  {isClientData(previewData) && (
+                    <>
+                      <h3 className="text-xl font-bold">{previewData.name}</h3>
+                      <p className="text-muted-foreground">Client Information</p>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <Button
@@ -1036,223 +1262,33 @@ export default function AIPage() {
                     Edit
                   </Button>
                   <Button
-                    onClick={handleConfirm}
+                    onClick={handleSaveToSupabase}
                     className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
                   >
-                    Save Chart
+                    Save Client
                   </Button>
                 </div>
               </div>
 
-              {previewData.type === "pie" ? (
-                <div className="h-[300px] flex items-center justify-center relative">
-                  <div className="w-[250px] h-[250px] rounded-full relative overflow-hidden">
-                    {previewData.data.map((item: any, index: number) => {
-                      const total = previewData.data.reduce(
-                        (sum: number, d: any) => sum + d.value,
-                        0
-                      );
-                      const startAngle = previewData.data
-                        .slice(0, index)
-                        .reduce(
-                          (sum: number, d: any) =>
-                            sum + (d.value / total) * 360,
-                          0
-                        );
-                      const angle = (item.value / total) * 360;
-
-                      return (
-                        <div
-                          key={index}
-                          className="absolute top-0 left-0 w-full h-full origin-center"
-                          style={{
-                            transform: `rotate(${startAngle}deg)`,
-                            clipPath: `polygon(50% 50%, 50% 0%, ${angle <= 180 ? "100% 0%" : "100% 0%, 100% 100%"}, ${angle <= 90 ? "50% 50%" : angle <= 180 ? "100% 100%, 50% 50%" : angle <= 270 ? "100% 100%, 0% 100%, 50% 50%" : "100% 100%, 0% 100%, 0% 0%, 50% 50%"})`,
-                          }}
-                        >
-                          <div
-                            className="w-full h-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                        </div>
-                      );
-                    })}
-                    <div className="absolute inset-[25%] rounded-full bg-background flex items-center justify-center">
-                      <span className="text-xl font-bold">Total</span>
-                    </div>
-                  </div>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 space-y-2">
-                    {previewData.data.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-4 rounded-sm"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span>
-                          {item.label}: ${item.value.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-[300px] w-full pt-6">
-                  <div className="flex h-full items-end justify-between gap-4 border-b border-l">
-                    {previewData.data.map((item: any, index: number) => {
-                      const maxValue = Math.max(
-                        ...previewData.data.map((d: any) => d.value)
-                      );
-                      const height = (item.value / maxValue) * 100;
-
-                      return (
-                        <div
-                          key={index}
-                          className="flex flex-col items-center gap-2 w-full"
-                        >
-                          <div
-                            className="w-full max-w-[80px] rounded-t-md transition-all duration-500 animate-in slide-in-from-bottom-4"
-                            style={{
-                              height: `${height * 2}px`,
-                              backgroundColor: item.color,
-                              animationDelay: `${index * 150}ms`,
-                            }}
-                          />
-                          <div className="text-sm font-medium">
-                            {item.label}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            ${item.value.toLocaleString()}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-
-      case "client":
-        return (
-          <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
-            <CardContent className="p-6">
-              <h3 className="text-xl font-bold mb-4">Client Preview</h3>
-              {isEditing && previewType === "client" ? (
+              {isClientData(previewData) && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">
-                        Company Name
-                      </p>
-                      <Input
-                        value={editedData.name}
-                        onChange={(e) =>
-                          handleEditChange("name", e.target.value)
-                        }
-                      />
+                      <p className="text-sm font-medium text-muted-foreground">Email</p>
+                      <p>{previewData.email}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">
-                        Contact Name
-                      </p>
-                      <Input
-                        value={editedData.contactName}
-                        onChange={(e) =>
-                          handleEditChange("contactName", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <Input
-                        value={editedData.email}
-                        onChange={(e) =>
-                          handleEditChange("email", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Phone</p>
-                      <Input
-                        value={editedData.phone}
-                        onChange={(e) =>
-                          handleEditChange("phone", e.target.value)
-                        }
-                      />
+                      <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                      <p>{previewData.phone}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Address</p>
-                    <Input
-                      value={editedData.address}
-                      onChange={(e) =>
-                        handleEditChange("address", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="pt-4 flex justify-end gap-3">
-                    <Button
-                      onClick={handleCancelEdit}
-                      variant="outline"
-                      className="rounded-full"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveEdit}
-                      className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Company Name
-                      </p>
-                      <p className="font-medium">{previewData.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Contact Name
-                      </p>
-                      <p className="font-medium">{previewData.contactName}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium">{previewData.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Phone</p>
-                      <p className="font-medium">{previewData.phone}</p>
-                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">Address</p>
+                    <p>{previewData.address}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Address</p>
-                    <p className="font-medium">{previewData.address}</p>
-                  </div>
-                  <div className="pt-4 flex justify-end gap-3">
-                    <Button
-                      onClick={handleEdit}
-                      variant="outline"
-                      className="rounded-full"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={handleConfirm}
-                      className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-                    >
-                      Confirm & Save
-                    </Button>
+                    <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
+                    <p>{previewData.contactName}</p>
                   </div>
                 </div>
               )}
@@ -1264,144 +1300,57 @@ export default function AIPage() {
         return (
           <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
             <CardContent className="p-6">
-              <h3 className="text-xl font-bold mb-4">
-                {previewData.type} Preview
-              </h3>
-              {isEditing && previewType === "product" ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Name</p>
-                      <Input
-                        value={editedData.name}
-                        onChange={(e) =>
-                          handleEditChange("name", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Type</p>
-                      <Select
-                        value={editedData.type}
-                        onValueChange={(value) =>
-                          handleEditChange("type", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Product">Product</SelectItem>
-                          <SelectItem value="Service">Service</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <Textarea
-                      value={editedData.description}
-                      onChange={(e) =>
-                        handleEditChange("description", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Price</p>
-                      <Input
-                        type="number"
-                        value={editedData.price}
-                        onChange={(e) =>
-                          handleEditChange("price", parseFloat(e.target.value))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Unit</p>
-                      <Input
-                        value={editedData.unit}
-                        onChange={(e) =>
-                          handleEditChange("unit", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tax Rate</p>
-                      <Input
-                        type="number"
-                        value={editedData.taxRate}
-                        onChange={(e) =>
-                          handleEditChange(
-                            "taxRate",
-                            parseFloat(e.target.value)
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="pt-4 flex justify-end gap-3">
-                    <Button
-                      onClick={handleCancelEdit}
-                      variant="outline"
-                      className="rounded-full"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveEdit}
-                      className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  {isProductData(previewData) && (
+                    <>
+                      <h3 className="text-xl font-bold">{previewData.name}</h3>
+                      <p className="text-muted-foreground">Product Information</p>
+                    </>
+                  )}
                 </div>
-              ) : (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleEdit}
+                    variant="outline"
+                    className="rounded-full"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    onClick={handleSaveToSupabase}
+                    className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
+                  >
+                    Save Product
+                  </Button>
+                </div>
+              </div>
+
+              {isProductData(previewData) && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Name</p>
-                      <p className="font-medium">{previewData.name}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Type</p>
+                      <p className="capitalize">{previewData.type}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Type</p>
-                      <p className="font-medium">{previewData.type}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Price</p>
+                      <p>${previewData.price.toFixed(2)}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="font-medium">{previewData.description}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Description</p>
+                    <p>{previewData.description}</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Price</p>
-                      <p className="font-medium">
-                        ${previewData.price.toFixed(2)}
-                      </p>
+                      <p className="text-sm font-medium text-muted-foreground">Unit</p>
+                      <p>{previewData.unit}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Unit</p>
-                      <p className="font-medium">{previewData.unit}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Tax Rate</p>
+                      <p>{previewData.taxRate}%</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tax Rate</p>
-                      <p className="font-medium">{previewData.taxRate}%</p>
-                    </div>
-                  </div>
-                  <div className="pt-4 flex justify-end gap-3">
-                    <Button
-                      onClick={handleEdit}
-                      variant="outline"
-                      className="rounded-full"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={handleConfirm}
-                      className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-                    >
-                      Confirm & Save
-                    </Button>
                   </div>
                 </div>
               )}
@@ -1411,26 +1360,17 @@ export default function AIPage() {
 
       case "invoice":
         return (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">Invoice Preview</h3>
-              {isEditing && previewType === "invoice" ? (
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleCancelEdit}
-                    variant="outline"
-                    className="rounded-full"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSaveEdit}
-                    className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
-                  >
-                    Save Changes
-                  </Button>
+          <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  {isInvoiceData(previewData) && (
+                    <>
+                      <h3 className="text-xl font-bold">Invoice for {previewData.client.name}</h3>
+                      <p className="text-muted-foreground">Due on {new Date(previewData.dueDate).toLocaleDateString()}</p>
+                    </>
+                  )}
                 </div>
-              ) : (
                 <div className="flex gap-3">
                   <Button
                     onClick={handleEdit}
@@ -1440,244 +1380,69 @@ export default function AIPage() {
                     Edit
                   </Button>
                   <Button
-                    onClick={handleConfirm}
+                    onClick={handleSaveToSupabase}
                     className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
                   >
-                    Confirm & Save
+                    Save Invoice
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {isEditing && previewType === "invoice" ? (
-              <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
-                <CardContent className="p-6">
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-lg font-medium mb-2">
-                        Client Information
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Client
-                          </p>
-                          <Input
-                            value={editedData.client.name}
-                            onChange={(e) => {
-                              const updatedClient = {
-                                ...editedData.client,
-                                name: e.target.value,
-                              };
-                              handleEditChange("client", updatedClient);
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Due Date
-                          </p>
-                          <Input
-                            value={editedData.dueDate}
-                            onChange={(e) =>
-                              handleEditChange("dueDate", e.target.value)
-                            }
-                          />
-                        </div>
+              {isInvoiceData(previewData) && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Client Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Email</p>
+                        <p>{previewData.client.email}</p>
                       </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-lg font-medium mb-2">
-                        Invoice Items
-                      </h4>
-                      {editedData.items.map((item: any, index: number) => (
-                        <div
-                          key={index}
-                          className="grid grid-cols-12 gap-2 mb-2"
-                        >
-                          <div className="col-span-6">
-                            <Input
-                              value={item.description}
-                              onChange={(e) => {
-                                const updatedItems = [...editedData.items];
-                                updatedItems[index] = {
-                                  ...item,
-                                  description: e.target.value,
-                                };
-                                handleEditChange("items", updatedItems);
-                              }}
-                              placeholder="Description"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const updatedItems = [...editedData.items];
-                                updatedItems[index] = {
-                                  ...item,
-                                  quantity: parseInt(e.target.value),
-                                };
-
-                                // Recalculate totals
-                                const subtotal = updatedItems.reduce(
-                                  (sum, item) =>
-                                    sum + item.quantity * item.price,
-                                  0
-                                );
-                                const tax = subtotal * 0.1;
-                                const total = subtotal + tax;
-
-                                setEditedData({
-                                  ...editedData,
-                                  items: updatedItems,
-                                  subtotal,
-                                  tax,
-                                  total,
-                                });
-                              }}
-                              placeholder="Qty"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <Input
-                              type="number"
-                              value={item.price}
-                              onChange={(e) => {
-                                const updatedItems = [...editedData.items];
-                                updatedItems[index] = {
-                                  ...item,
-                                  price: parseFloat(e.target.value),
-                                };
-
-                                // Recalculate totals
-                                const subtotal = updatedItems.reduce(
-                                  (sum, item) =>
-                                    sum + item.quantity * item.price,
-                                  0
-                                );
-                                const tax = subtotal * 0.1;
-                                const total = subtotal + tax;
-
-                                setEditedData({
-                                  ...editedData,
-                                  items: updatedItems,
-                                  subtotal,
-                                  tax,
-                                  total,
-                                });
-                              }}
-                              placeholder="Price"
-                            />
-                          </div>
-                          <div className="col-span-2 flex items-center">
-                            ${(item.quantity * item.price).toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => {
-                          const updatedItems = [
-                            ...editedData.items,
-                            {
-                              description: "New Item",
-                              quantity: 1,
-                              price: 0,
-                            },
-                          ];
-                          handleEditChange("items", updatedItems);
-                        }}
-                      >
-                        Add Item
-                      </Button>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between mb-2">
-                        <span>Subtotal:</span>
-                        <span>${editedData.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span>Tax (10%):</span>
-                        <span>${editedData.tax.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold">
-                        <span>Total:</span>
-                        <span>${editedData.total.toFixed(2)}</span>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Address</p>
+                        <p>{previewData.client.address}</p>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
-                <CardContent className="p-0">
-                  <Tabs defaultValue="preview">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="preview">Preview</TabsTrigger>
-                      <TabsTrigger value="templates">Templates</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="preview" className="mt-0">
-                      <InvoicePreview
-                        invoiceData={previewData}
-                        templateId={selectedTemplate}
-                      />
-                    </TabsContent>
-                    <TabsContent value="templates" className="mt-0">
-                      <div className="grid grid-cols-3 gap-4 p-4">
-                        <div
-                          className={`cursor-pointer rounded-lg overflow-hidden border-2 ${
-                            selectedTemplate === 1
-                              ? "border-vibrant-yellow"
-                              : "border-transparent"
-                          }`}
-                          onClick={() => setSelectedTemplate(1)}
-                        >
-                          <InvoicePreview
-                            invoiceData={previewData}
-                            templateId={1}
-                            scale={0.8}
-                          />
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Items</h4>
+                    <div className="space-y-2">
+                      {previewData.items.map((item, index) => (
+                        <div key={index} className="grid grid-cols-4 gap-4 p-2 rounded-lg bg-muted/50">
+                          <div className="col-span-2">
+                            <p className="font-medium">{item.description}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              {item.quantity} x ${item.price.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p>${(item.quantity * item.price).toFixed(2)}</p>
+                          </div>
                         </div>
-                        <div
-                          className={`cursor-pointer rounded-lg overflow-hidden border-2 ${
-                            selectedTemplate === 2
-                              ? "border-vibrant-yellow"
-                              : "border-transparent"
-                          }`}
-                          onClick={() => setSelectedTemplate(2)}
-                        >
-                          <InvoicePreview
-                            invoiceData={previewData}
-                            templateId={2}
-                            scale={0.8}
-                          />
-                        </div>
-                        <div
-                          className={`cursor-pointer rounded-lg overflow-hidden border-2 ${
-                            selectedTemplate === 3
-                              ? "border-vibrant-yellow"
-                              : "border-transparent"
-                          }`}
-                          onClick={() => setSelectedTemplate(3)}
-                        >
-                          <InvoicePreview
-                            invoiceData={previewData}
-                            templateId={3}
-                            scale={0.8}
-                          />
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <p className="text-muted-foreground">Subtotal</p>
+                      <p>${previewData.subtotal.toFixed(2)}</p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="text-muted-foreground">Tax</p>
+                      <p>${previewData.tax.toFixed(2)}</p>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <p>Total</p>
+                      <p>${previewData.total.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         );
 
       case "report":
@@ -1686,10 +1451,12 @@ export default function AIPage() {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold">{previewData.title}</h3>
-                  <p className="text-muted-foreground">
-                    {previewData.period} Report
-                  </p>
+                  {isReportData(previewData) && (
+                    <>
+                      <h3 className="text-xl font-bold">{previewData.title}</h3>
+                      <p className="text-muted-foreground capitalize">{previewData.period} Report</p>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <Button
@@ -1700,35 +1467,173 @@ export default function AIPage() {
                     Edit
                   </Button>
                   <Button
-                    onClick={handleConfirm}
+                    onClick={handleSaveToSupabase}
                     className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
                   >
-                    Confirm & Save
+                    Save Report
                   </Button>
                 </div>
               </div>
 
-              <p className="mb-6">{previewData.summary}</p>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {previewData.metrics.map((metric: any, index: number) => (
-                  <div key={index} className="bg-muted/30 p-4 rounded-lg">
-                    <p className="text-sm text-muted-foreground">
-                      {metric.name}
-                    </p>
-                    <p className="text-2xl font-bold">{metric.value}</p>
-                    <p
-                      className={`text-sm ${metric.change.startsWith("+") ? "text-green-500" : "text-red-500"}`}
-                    >
-                      {metric.change}
-                    </p>
+              {isReportData(previewData) && (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-medium mb-2">Summary</h4>
+                    <p className="text-muted-foreground">{previewData.summary}</p>
                   </div>
-                ))}
+
+                  <div>
+                    <h4 className="font-medium mb-4">Key Metrics</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {previewData.metrics.map((metric, index) => (
+                        <div
+                          key={index}
+                          className="p-4 rounded-lg bg-muted/50"
+                        >
+                          <p className="text-sm font-medium">{metric.label}</p>
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-2xl font-bold">
+                              ${metric.value.toLocaleString()}
+                            </p>
+                            {metric.change && (
+                              <p
+                                className={
+                                  metric.change.startsWith("+")
+                                    ? "text-green-500"
+                                    : "text-red-500"
+                                }
+                              >
+                                {metric.change}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      case "chart":
+        return (
+          <Card className="modern-card overflow-hidden border-2 border-vibrant-yellow/30 hover:border-vibrant-yellow/60 shadow-[0_0_15px_rgba(245,215,66,0.15)] transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  {isChartData(previewData) && (
+                    <>
+                      <h3 className="text-xl font-bold">{previewData.title}</h3>
+                      <p className="text-muted-foreground">Custom visualization</p>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleEdit}
+                    variant="outline"
+                    className="rounded-full"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    onClick={handleSaveToSupabase}
+                    className="rounded-full bg-vibrant-yellow text-vibrant-black hover:bg-vibrant-yellow/90"
+                  >
+                    Save Chart
+                  </Button>
+                </div>
               </div>
 
-              <div className="bg-muted/30 p-6 rounded-lg text-center">
-                <p className="text-muted-foreground">{previewData.chartData}</p>
-              </div>
+              {isChartData(previewData) && (
+                previewData.type === "pie" ? (
+                  <div className="h-[300px] flex items-center justify-center relative">
+                    <div className="w-[250px] h-[250px] rounded-full relative overflow-hidden">
+                      {previewData.data.map((item, index) => {
+                        const total = previewData.data.reduce(
+                          (sum, d) => sum + d.value,
+                          0
+                        );
+                        const startAngle = previewData.data
+                          .slice(0, index)
+                          .reduce(
+                            (sum, d) =>
+                              sum + (d.value / total) * 360,
+                            0
+                          );
+                        const angle = (item.value / total) * 360;
+
+                        return (
+                          <div
+                            key={index}
+                            className="absolute top-0 left-0 w-full h-full origin-center"
+                            style={{
+                              transform: `rotate(${startAngle}deg)`,
+                              clipPath: `polygon(50% 50%, 50% 0%, ${angle <= 180 ? "100% 0%" : "100% 0%, 100% 100%"}, ${angle <= 90 ? "50% 50%" : angle <= 180 ? "100% 100%, 50% 50%" : angle <= 270 ? "100% 100%, 0% 100%, 50% 50%" : "100% 100%, 0% 100%, 0% 0%, 50% 50%"})`,
+                            }}
+                          >
+                            <div
+                              className="w-full h-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                          </div>
+                        );
+                      })}
+                      <div className="absolute inset-[25%] rounded-full bg-background flex items-center justify-center">
+                        <span className="text-xl font-bold">Total</span>
+                      </div>
+                    </div>
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 space-y-2">
+                      {previewData.data.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div
+                            className="w-4 h-4 rounded-sm"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span>
+                            {item.label}: ${item.value.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[300px] w-full pt-6">
+                    <div className="flex h-full items-end justify-between gap-4 border-b border-l">
+                      {previewData.data.map((item, index) => {
+                        const maxValue = Math.max(
+                          ...previewData.data.map((d) => d.value)
+                        );
+                        const height = (item.value / maxValue) * 100;
+
+                        return (
+                          <div
+                            key={index}
+                            className="flex flex-col items-center gap-2 w-full"
+                          >
+                            <div
+                              className="w-full max-w-[80px] rounded-t-md transition-all duration-500 animate-in slide-in-from-bottom-4"
+                              style={{
+                                height: `${height * 2}px`,
+                                backgroundColor: item.color,
+                                animationDelay: `${index * 150}ms`,
+                              }}
+                            />
+                            <div className="text-sm font-medium">
+                              {item.label}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              ${item.value.toLocaleString()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              )}
             </CardContent>
           </Card>
         );

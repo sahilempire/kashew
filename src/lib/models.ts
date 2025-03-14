@@ -69,8 +69,8 @@ export interface Invoice {
 export interface ReportMetric {
   label: string;
   value: number;
-  change?: number;
-  changeType?: 'increase' | 'decrease' | 'neutral';
+  change?: string;
+  changeType: 'increase' | 'decrease' | 'neutral';
 }
 
 // Report model
