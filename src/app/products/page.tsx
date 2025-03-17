@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,9 @@ import {
   Search,
   MoreHorizontal,
   ShoppingBag,
-  Package,
+  Package2,
+  Archive,
+  Coins,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,68 +31,48 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import AddProductModal from "@/components/modals/AddProductModal";
+import { getProducts, createProduct, updateProduct, deleteProduct } from "@/lib/queries";
+import { useRouter } from "next/navigation";
+
+interface Product {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  price: number;
+  unit: string;
+  taxRate: number;
+  archived: boolean;
+}
 
 export default function ProductsPage() {
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [summary, setSummary] = useState({
+    totalProducts: 0,
+    totalValue: 0,
+    activeProducts: 0,
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
 
-  // Products data
-  const productsData = [
-    {
-      id: "1",
-      name: "Website Design",
-      type: "Service",
-      description: "Custom website design and development",
-      price: 2500.0,
-      unit: "Project",
-      taxRate: 10,
-    },
-    {
-      id: "2",
-      name: "Logo Design",
-      type: "Service",
-      description: "Professional logo design with revisions",
-      price: 800.0,
-      unit: "Project",
-      taxRate: 10,
-    },
-    {
-      id: "3",
-      name: "SEO Optimization",
-      type: "Service",
-      description: "Search engine optimization services",
-      price: 1200.0,
-      unit: "Month",
-      taxRate: 10,
-    },
-    {
-      id: "4",
-      name: "Content Writing",
-      type: "Service",
-      description: "Professional content writing services",
-      price: 120.0,
-      unit: "Hour",
-      taxRate: 10,
-    },
-    {
-      id: "5",
-      name: "Web Hosting",
-      type: "Product",
-      description: "Premium web hosting package",
-      price: 150.0,
-      unit: "Year",
-      taxRate: 10,
-    },
-    {
-      id: "6",
-      name: "Domain Name",
-      type: "Product",
-      description: "Domain name registration",
-      price: 15.0,
-      unit: "Year",
-      taxRate: 10,
-    },
-  ];
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  async function loadProducts() {
+    try {
+      const data = await getProducts();
+      setProducts(data.products);
+      setSummary(data.summary);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -99,15 +81,58 @@ export default function ProductsPage() {
     }).format(amount);
   };
 
-  const handleAddProduct = (data: any) => {
-    console.log("New product data:", data);
-    // In a real app, we would add the product to the database
+  const handleAddProduct = async (data: any) => {
+    try {
+      setAddProductOpen(false);
+      await loadProducts(); // Reload the products list
+    } catch (error) {
+      console.error('Error creating product:', error);
+    }
   };
 
-  const handleAddService = (data: any) => {
-    console.log("New service data:", data);
-    // In a real app, we would add the service to the database
+  const handleAddService = async (data: any) => {
+    try {
+      setAddServiceOpen(false);
+      await loadProducts(); // Reload the products list
+    } catch (error) {
+      console.error('Error creating service:', error);
+    }
   };
+
+  const handleArchiveProduct = async (productId: string, archived: boolean) => {
+    try {
+      await updateProduct(productId, { archived });
+      await loadProducts(); // Reload the products list
+    } catch (error) {
+      console.error('Error updating product:', error);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+    
+    try {
+      await deleteProduct(productId);
+      await loadProducts(); // Reload the products list
+    } catch (error) {
+      console.error('Error deleting product:', error);
+    }
+  };
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Products">
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Products & Services">
@@ -125,7 +150,7 @@ export default function ProductsPage() {
               className="gap-2 rounded-full"
               onClick={() => setAddProductOpen(true)}
             >
-              <Package className="h-4 w-4" />
+              <Package2 className="h-4 w-4" />
               Add Product
             </Button>
             <Button
@@ -141,34 +166,33 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="modern-card bg-vibrant-yellow p-6">
             <div className="rounded-full bg-black/10 p-3 w-fit">
-              <ShoppingBag className="h-6 w-6 text-black" />
+              <Package2 className="h-6 w-6 text-black" />
             </div>
             <div className="mt-4">
-              <p className="text-sm text-black/70">Total Items</p>
-              <h3 className="text-3xl font-bold text-black">6</h3>
-              <p className="text-sm text-black/70 mt-1">Products & Services</p>
+              <p className="text-sm text-black/70">Total Products</p>
+              <h3 className="text-3xl font-bold text-black">{summary.totalProducts}</h3>
             </div>
           </div>
 
           <div className="modern-card bg-vibrant-pink p-6">
             <div className="rounded-full bg-black/10 p-3 w-fit">
-              <ShoppingBag className="h-6 w-6 text-black" />
+              <Archive className="h-6 w-6 text-black" />
             </div>
             <div className="mt-4">
-              <p className="text-sm text-black/70">Services</p>
-              <h3 className="text-3xl font-bold text-black">4</h3>
-              <p className="text-sm text-black/70 mt-1">Items</p>
+              <p className="text-sm text-black/70">Active Products</p>
+              <h3 className="text-3xl font-bold text-black">{summary.activeProducts}</h3>
             </div>
           </div>
 
           <div className="modern-card bg-vibrant-green p-6">
             <div className="rounded-full bg-white/10 p-3 w-fit">
-              <ShoppingBag className="h-6 w-6 text-white" />
+              <Coins className="h-6 w-6 text-white" />
             </div>
             <div className="mt-4">
-              <p className="text-sm text-white/70">Products</p>
-              <h3 className="text-3xl font-bold text-white">2</h3>
-              <p className="text-sm text-white/70 mt-1">Items</p>
+              <p className="text-sm text-white/70">Total Value</p>
+              <h3 className="text-3xl font-bold text-white">
+                {formatCurrency(summary.totalValue)}
+              </h3>
             </div>
           </div>
         </div>
@@ -176,79 +200,117 @@ export default function ProductsPage() {
         <div className="modern-card bg-background">
           <div className="p-6 pb-0">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Catalog</h2>
+              <h2 className="text-xl font-semibold">Product List</h2>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search catalog..."
+                  placeholder="Search products..."
                   className="w-[250px] pl-8 rounded-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
           </div>
 
           <div className="p-6 pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Tax Rate</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {productsData.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">
-                      {product.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`rounded-full px-3 ${product.type === "Service" ? "bg-vibrant-pink text-black" : "bg-vibrant-yellow text-black"}`}
-                      >
-                        {product.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {product.description}
-                    </TableCell>
-                    <TableCell>{formatCurrency(product.price)}</TableCell>
-                    <TableCell>Per {product.unit}</TableCell>
-                    <TableCell>{product.taxRate}%</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>Edit Item</DropdownMenuItem>
-                          <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                {searchQuery ? "No products found matching your search." : "No products yet. Add your first product to get started."}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Tax Rate</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`rounded-full px-3 ${product.type === "Service" ? "bg-vibrant-pink text-black" : "bg-vibrant-yellow text-black"}`}
+                        >
+                          {product.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">{product.description}</TableCell>
+                      <TableCell>{formatCurrency(product.price)}</TableCell>
+                      <TableCell>Per {product.unit}</TableCell>
+                      <TableCell>{product.taxRate}%</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                          product.archived 
+                            ? 'bg-gray-100 text-gray-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {product.archived ? 'Archived' : 'Active'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => router.push(`/products/${product.id}`)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/products/${product.id}/edit`)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                if (confirm('Are you sure you want to archive this product?')) {
+                                  await updateProduct(product.id, {
+                                    ...product,
+                                    archived: !product.archived,
+                                  });
+                                  loadProducts();
+                                }
+                              }}
+                            >
+                              {product.archived ? 'Unarchive' : 'Archive'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={async () => {
+                                if (confirm('Are you sure you want to delete this product?')) {
+                                  await deleteProduct(product.id);
+                                  loadProducts();
+                                }
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
 

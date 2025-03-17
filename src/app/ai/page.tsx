@@ -277,12 +277,12 @@ export default function AIPage() {
   const handleConfirm = () => {
     // In a real app, this would save the data to the database
     const confirmationMessage = `I've saved the ${previewType}. Is there anything else you'd like to do?`;
-    setChatHistory([
-      ...chatHistory,
+      setChatHistory([
+        ...chatHistory,
       { role: "assistant", content: confirmationMessage },
     ]);
-    setPreviewType("none");
-    setPreviewData(null);
+      setPreviewType("none");
+      setPreviewData(null);
   };
 
   const handleSwitchToRetro = () => {
@@ -623,35 +623,35 @@ export default function AIPage() {
           <Card className="modern-card overflow-hidden">
             <CardContent className="p-6">
               <h3 className="text-xl font-bold mb-4">Client Preview</h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Company Name
-                    </p>
-                    <p className="font-medium">{previewData.name}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Company Name
+                      </p>
+                      <p className="font-medium">{previewData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Contact Name
+                      </p>
+                      <p className="font-medium">{previewData.contactName}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium">{previewData.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium">{previewData.phone}</p>
+                    </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      Contact Name
-                    </p>
-                    <p className="font-medium">{previewData.contactName}</p>
+                    <p className="text-sm text-muted-foreground">Address</p>
+                    <p className="font-medium">{previewData.address}</p>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{previewData.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Phone</p>
-                    <p className="font-medium">{previewData.phone}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="font-medium">{previewData.address}</p>
-                </div>
                 <div className="pt-4 flex justify-end gap-3">
                   <Button
                     onClick={handleEdit}
@@ -679,37 +679,37 @@ export default function AIPage() {
               <h3 className="text-xl font-bold mb-4">
                 {previewData.type} Preview
               </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{previewData.name}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Name</p>
+                      <p className="font-medium">{previewData.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Type</p>
+                      <p className="font-medium">{previewData.type}</p>
+                    </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Type</p>
-                    <p className="font-medium">{previewData.type}</p>
+                    <p className="text-sm text-muted-foreground">Description</p>
+                    <p className="font-medium">{previewData.description}</p>
                   </div>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="font-medium">{previewData.description}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Price</p>
-                    <p className="font-medium">
-                      ${previewData.price.toFixed(2)}
-                    </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Price</p>
+                      <p className="font-medium">
+                        ${previewData.price.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Unit</p>
+                      <p className="font-medium">{previewData.unit}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tax Rate</p>
+                      <p className="font-medium">{previewData.taxRate}%</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Unit</p>
-                    <p className="font-medium">{previewData.unit}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tax Rate</p>
-                    <p className="font-medium">{previewData.taxRate}%</p>
-                  </div>
-                </div>
                 <div className="pt-4 flex justify-end gap-3">
                   <Button
                     onClick={handleEdit}
@@ -736,9 +736,9 @@ export default function AIPage() {
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-bold">Invoice Preview</h3>
               <div className="flex gap-3">
-                <Button
+                      <Button
                   onClick={handleEdit}
-                  variant="outline"
+                        variant="outline"
                   className="rounded-full"
                 >
                   Edit
@@ -748,9 +748,9 @@ export default function AIPage() {
                   className="rounded-full bg-vibrant-green text-white hover:bg-vibrant-green/90"
                 >
                   Confirm & Save
-                </Button>
-              </div>
-            </div>
+                      </Button>
+                    </div>
+                      </div>
             <Tabs
               value={selectedTemplate.toString()}
               onValueChange={(v) => setSelectedTemplate(parseInt(v))}
@@ -761,11 +761,11 @@ export default function AIPage() {
                 <TabsTrigger value="3">Minimal</TabsTrigger>
                 <TabsTrigger value="4">Creative</TabsTrigger>
                 <TabsTrigger value="5">Classic</TabsTrigger>
-              </TabsList>
+                    </TabsList>
             </Tabs>
-            <InvoicePreview
-              templateId={selectedTemplate}
-              invoiceData={previewData}
+                      <InvoicePreview
+                        templateId={selectedTemplate}
+                            invoiceData={previewData}
             />
           </div>
         );
@@ -776,7 +776,7 @@ export default function AIPage() {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold">{previewData.title}</h3>
+                      <h3 className="text-xl font-bold">{previewData.title}</h3>
                   <p className="text-muted-foreground">
                     {previewData.period} Report
                   </p>
@@ -795,26 +795,26 @@ export default function AIPage() {
                   >
                     Confirm & Save
                   </Button>
-                </div>
               </div>
+                  </div>
 
-              <p className="mb-6">{previewData.summary}</p>
+                  <p className="mb-6">{previewData.summary}</p>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {previewData.metrics.map((metric: any, index: number) => (
-                  <div key={index} className="bg-muted/30 p-4 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    {previewData.metrics.map((metric: any, index: number) => (
+                      <div key={index} className="bg-muted/30 p-4 rounded-lg">
                     <p className="text-sm text-muted-foreground">
                       {metric.name}
                     </p>
-                    <p className="text-2xl font-bold">{metric.value}</p>
-                    <p
+                        <p className="text-2xl font-bold">{metric.value}</p>
+                        <p
                       className={`text-sm ${metric.change.startsWith("+") ? "text-green-500" : "text-red-500"}`}
-                    >
-                      {metric.change}
-                    </p>
+                        >
+                          {metric.change}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
               <div className="bg-muted/30 p-6 rounded-lg text-center">
                 <p className="text-muted-foreground">{previewData.chartData}</p>
@@ -868,13 +868,13 @@ export default function AIPage() {
               </div>
 
               <div className="flex gap-2">
-                <Input
+                  <Input
                   placeholder="Ask me to create clients, products, invoices, charts, or generate reports..."
-                  value={message}
-                  onChange={handleMessageChange}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                    value={message}
+                    onChange={handleMessageChange}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                   className="flex-1"
-                />
+                  />
                 <Button
                   onClick={handleSendMessage}
                   className="bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90 transition-all duration-300 hover:scale-105 active:scale-95"

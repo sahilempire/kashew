@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sparkles, LayoutDashboard } from "lucide-react";
 import dynamic from "next/dynamic";
+import { getDashboardData } from "@/lib/queries";
 
 const ProtectedRoute = dynamic(
   () => import("@/components/layout/ProtectedRoute"),
@@ -14,15 +15,64 @@ import AnalyticsSummary from "@/components/dashboard/AnalyticsSummary";
 import RecentInvoices from "@/components/dashboard/RecentInvoices";
 import RevenueChart from "@/components/dashboard/RevenueChart";
 import InvoiceStatusChart from "@/components/dashboard/InvoiceStatusChart";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useEffect, useState } from "react";
+
+interface DashboardData {
+  analytics: {
+    totalRevenue: number;
+    outstandingInvoices: number;
+    paidInvoices: number;
+    overdueInvoices: number;
+  };
+  recentInvoices: any[];
+  revenueByMonth: Array<{
+    month: string;
+    revenue: number;
+  }>;
+  growth: number;
+  statusDistribution: {
+    paid: number;
+    pending: number;
+    overdue: number;
+  };
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        const data = await getDashboardData();
+        setDashboardData(data);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, []);
 
   const handleSwitchToAI = () => {
     router.push("/ai");
   };
+
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <DashboardLayout title="Dashboard">
+          <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        </DashboardLayout>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -53,27 +103,20 @@ export default function DashboardPage() {
           </div>
 
           {/* Analytics Summary */}
-          <AnalyticsSummary />
-          <div className="text-right text-xs text-muted-foreground">
-            Response time: 0.24s
-          </div>
+          <AnalyticsSummary data={dashboardData?.analytics} />
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative animate-in fade-in duration-300 delay-200">
-            <div className="absolute -top-6 right-0 text-xs text-muted-foreground">
-              Response time: 0.18s
-            </div>
-            <RevenueChart className="lg:col-span-2" />
-            <InvoiceStatusChart />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <RevenueChart 
+              className="lg:col-span-2" 
+              data={dashboardData?.revenueByMonth}
+              growth={dashboardData?.growth}
+            />
+            <InvoiceStatusChart data={dashboardData?.statusDistribution} />
           </div>
 
           {/* Recent Invoices */}
-          <div className="relative animate-in fade-in duration-300 delay-300">
-            <div className="absolute -top-6 right-0 text-xs text-muted-foreground">
-              Response time: 0.31s
-            </div>
-            <RecentInvoices />
-          </div>
+          <RecentInvoices invoices={dashboardData?.recentInvoices} />
         </div>
       </DashboardLayout>
     </ProtectedRoute>

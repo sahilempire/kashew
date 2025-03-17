@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,146 @@ import {
   Shield,
   Mail,
   Globe,
+  Loader2,
 } from "lucide-react";
+import { getProfile, updateProfile, updateCompany, updatePassword, updateNotificationPreferences } from "@/lib/queries";
+import { toast } from "sonner";
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  company_name: string;
+  company_email: string;
+  billing_address: string;
+  tax_number: string;
+  notification_preferences: {
+    invoice_created: boolean;
+    payment_received: boolean;
+    invoice_overdue: boolean;
+    marketing_emails: boolean;
+    browser_notifications: boolean;
+  };
+}
 
 export default function SettingsPage() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Password form state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  async function loadProfile() {
+    try {
+      const data = await getProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      setError("Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+
+    try {
+      setSaving(true);
+      await updateProfile({
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+      });
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error("Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCompanyUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+
+    try {
+      setSaving(true);
+      await updateCompany({
+        company_name: profile.company_name,
+        company_email: profile.company_email,
+        phone: profile.phone,
+        billing_address: profile.billing_address,
+        tax_number: profile.tax_number,
+      });
+      toast.success("Company information updated successfully");
+    } catch (error) {
+      console.error('Error updating company:', error);
+      toast.error("Failed to update company information");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await updatePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Password updated successfully");
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast.error("Failed to update password");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNotificationUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile?.notification_preferences) return;
+
+    try {
+      setSaving(true);
+      await updateNotificationPreferences(profile.notification_preferences);
+      toast.success("Notification preferences updated successfully");
+    } catch (error) {
+      console.error('Error updating notifications:', error);
+      toast.error("Failed to update notification preferences");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Settings">
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="Settings">
       <div className="space-y-6 pb-8">
@@ -96,94 +233,122 @@ export default function SettingsPage() {
             <div className="md:w-3/4 space-y-6">
               <TabsContent value="profile" className="space-y-6 mt-0">
                 <Card className="modern-card">
-                  <CardHeader>
-                    <CardTitle>Profile Information</CardTitle>
-                    <CardDescription>
-                      Update your personal information
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="space-y-2 flex-1">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input id="firstName" defaultValue="John" />
+                  <form onSubmit={handleProfileUpdate}>
+                    <CardHeader>
+                      <CardTitle>Profile Information</CardTitle>
+                      <CardDescription>
+                        Update your personal information
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input
+                          id="fullName"
+                          value={profile?.full_name || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, full_name: e.target.value } : null)}
+                        />
                       </div>
-                      <div className="space-y-2 flex-1">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input id="lastName" defaultValue="Doe" />
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={profile?.email || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, email: e.target.value } : null)}
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        defaultValue="john@example.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        defaultValue="(555) 123-4567"
-                      />
-                    </div>
-                    <div className="pt-4">
-                      <Button className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                        Save Changes
-                      </Button>
-                    </div>
-                  </CardContent>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={profile?.phone || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                        />
+                      </div>
+                      <div className="pt-4">
+                        <Button
+                          type="submit"
+                          className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+                          disabled={saving}
+                        >
+                          {saving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </form>
                 </Card>
               </TabsContent>
 
               <TabsContent value="company" className="space-y-6 mt-0">
                 <Card className="modern-card">
-                  <CardHeader>
-                    <CardTitle>Company Information</CardTitle>
-                    <CardDescription>
-                      Update your company details
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">Company Name</Label>
-                      <Input id="companyName" defaultValue="Acme Inc." />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyEmail">Company Email</Label>
-                      <Input
-                        id="companyEmail"
-                        type="email"
-                        defaultValue="info@acme.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyPhone">Company Phone</Label>
-                      <Input
-                        id="companyPhone"
-                        type="tel"
-                        defaultValue="(555) 987-6543"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyAddress">Address</Label>
-                      <Textarea
-                        id="companyAddress"
-                        defaultValue="123 Business St, Suite 100, San Francisco, CA 94107"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="taxId">Tax ID / VAT Number</Label>
-                      <Input id="taxId" defaultValue="US123456789" />
-                    </div>
-                    <div className="pt-4">
-                      <Button className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                        Save Changes
-                      </Button>
-                    </div>
-                  </CardContent>
+                  <form onSubmit={handleCompanyUpdate}>
+                    <CardHeader>
+                      <CardTitle>Company Information</CardTitle>
+                      <CardDescription>
+                        Update your company details
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyName">Company Name</Label>
+                        <Input
+                          id="companyName"
+                          value={profile?.company_name || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, company_name: e.target.value } : null)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="companyEmail">Company Email</Label>
+                        <Input
+                          id="companyEmail"
+                          type="email"
+                          value={profile?.company_email || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, company_email: e.target.value } : null)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="companyAddress">Address</Label>
+                        <Textarea
+                          id="companyAddress"
+                          value={profile?.billing_address || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, billing_address: e.target.value } : null)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="taxId">Tax ID / VAT Number</Label>
+                        <Input
+                          id="taxId"
+                          value={profile?.tax_number || ''}
+                          onChange={(e) => setProfile(prev => prev ? { ...prev, tax_number: e.target.value } : null)}
+                        />
+                      </div>
+                      <div className="pt-4">
+                        <Button
+                          type="submit"
+                          className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+                          disabled={saving}
+                        >
+                          {saving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </form>
                 </Card>
               </TabsContent>
 
@@ -233,18 +398,10 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <Label>Billing Address</Label>
                       <div className="p-4 border rounded-lg">
-                        <p>John Doe</p>
-                        <p>Acme Inc.</p>
-                        <p>123 Business St, Suite 100</p>
-                        <p>San Francisco, CA 94107</p>
-                        <p>United States</p>
+                        <p>{profile?.full_name}</p>
+                        <p>{profile?.company_name}</p>
+                        <p>{profile?.billing_address}</p>
                       </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                        Update Billing
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -252,165 +409,218 @@ export default function SettingsPage() {
 
               <TabsContent value="notifications" className="space-y-6 mt-0">
                 <Card className="modern-card">
-                  <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>
-                      Manage how you receive notifications
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Email Notifications
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="invoice-created">
-                              Invoice Created
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Receive an email when a new invoice is created
-                            </p>
+                  <form onSubmit={handleNotificationUpdate}>
+                    <CardHeader>
+                      <CardTitle>Notification Preferences</CardTitle>
+                      <CardDescription>
+                        Manage how you receive notifications
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Email Notifications
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="invoice-created">
+                                Invoice Created
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Receive an email when a new invoice is created
+                              </p>
+                            </div>
+                            <Switch
+                              id="invoice-created"
+                              checked={profile?.notification_preferences?.invoice_created}
+                              onCheckedChange={(checked) => setProfile(prev => prev ? {
+                                ...prev,
+                                notification_preferences: {
+                                  ...prev.notification_preferences,
+                                  invoice_created: checked
+                                }
+                              } : null)}
+                            />
                           </div>
-                          <Switch id="invoice-created" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="payment-received">
-                              Payment Received
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Receive an email when a payment is received
-                            </p>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="payment-received">
+                                Payment Received
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Receive an email when a payment is received
+                              </p>
+                            </div>
+                            <Switch
+                              id="payment-received"
+                              checked={profile?.notification_preferences?.payment_received}
+                              onCheckedChange={(checked) => setProfile(prev => prev ? {
+                                ...prev,
+                                notification_preferences: {
+                                  ...prev.notification_preferences,
+                                  payment_received: checked
+                                }
+                              } : null)}
+                            />
                           </div>
-                          <Switch id="payment-received" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="invoice-overdue">
-                              Invoice Overdue
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Receive an email when an invoice becomes overdue
-                            </p>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="invoice-overdue">
+                                Invoice Overdue
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Receive an email when an invoice becomes overdue
+                              </p>
+                            </div>
+                            <Switch
+                              id="invoice-overdue"
+                              checked={profile?.notification_preferences?.invoice_overdue}
+                              onCheckedChange={(checked) => setProfile(prev => prev ? {
+                                ...prev,
+                                notification_preferences: {
+                                  ...prev.notification_preferences,
+                                  invoice_overdue: checked
+                                }
+                              } : null)}
+                            />
                           </div>
-                          <Switch id="invoice-overdue" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="marketing-emails">
-                              Marketing Emails
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Receive emails about new features and offers
-                            </p>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="marketing-emails">
+                                Marketing Emails
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Receive emails about new features and offers
+                              </p>
+                            </div>
+                            <Switch
+                              id="marketing-emails"
+                              checked={profile?.notification_preferences?.marketing_emails}
+                              onCheckedChange={(checked) => setProfile(prev => prev ? {
+                                ...prev,
+                                notification_preferences: {
+                                  ...prev.notification_preferences,
+                                  marketing_emails: checked
+                                }
+                              } : null)}
+                            />
                           </div>
-                          <Switch id="marketing-emails" />
                         </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        System Notifications
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="browser-notifications">
-                              Browser Notifications
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Receive notifications in your browser
-                            </p>
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          System Notifications
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="browser-notifications">
+                                Browser Notifications
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Receive notifications in your browser
+                              </p>
+                            </div>
+                            <Switch
+                              id="browser-notifications"
+                              checked={profile?.notification_preferences?.browser_notifications}
+                              onCheckedChange={(checked) => setProfile(prev => prev ? {
+                                ...prev,
+                                notification_preferences: {
+                                  ...prev.notification_preferences,
+                                  browser_notifications: checked
+                                }
+                              } : null)}
+                            />
                           </div>
-                          <Switch id="browser-notifications" defaultChecked />
                         </div>
                       </div>
-                    </div>
 
-                    <div className="pt-4">
-                      <Button className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                        Save Preferences
-                      </Button>
-                    </div>
-                  </CardContent>
+                      <div className="pt-4">
+                        <Button
+                          type="submit"
+                          className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+                          disabled={saving}
+                        >
+                          {saving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Preferences'
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </form>
                 </Card>
               </TabsContent>
 
               <TabsContent value="security" className="space-y-6 mt-0">
                 <Card className="modern-card">
-                  <CardHeader>
-                    <CardTitle>Security Settings</CardTitle>
-                    <CardDescription>
-                      Manage your account security
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Change Password</h3>
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="current-password">
-                            Current Password
-                          </Label>
-                          <Input id="current-password" type="password" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="new-password">New Password</Label>
-                          <Input id="new-password" type="password" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="confirm-password">
-                            Confirm New Password
-                          </Label>
-                          <Input id="confirm-password" type="password" />
-                        </div>
-                        <Button className="mt-2 rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                          Update Password
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Two-Factor Authentication
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="two-factor">
-                              Enable Two-Factor Authentication
+                  <form onSubmit={handlePasswordUpdate}>
+                    <CardHeader>
+                      <CardTitle>Security Settings</CardTitle>
+                      <CardDescription>
+                        Manage your account security
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Change Password</h3>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="current-password">
+                              Current Password
                             </Label>
-                            <p className="text-sm text-muted-foreground">
-                              Add an extra layer of security to your account
-                            </p>
+                            <Input
+                              id="current-password"
+                              type="password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                            />
                           </div>
-                          <Switch id="two-factor" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Session Management
-                      </h3>
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Active Sessions</p>
-                            <p className="text-sm text-muted-foreground">
-                              You're currently logged in on 2 devices
-                            </p>
+                          <div className="space-y-2">
+                            <Label htmlFor="new-password">New Password</Label>
+                            <Input
+                              id="new-password"
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                            />
                           </div>
-                          <Button variant="outline" className="rounded-full">
-                            Manage Sessions
+                          <div className="space-y-2">
+                            <Label htmlFor="confirm-password">
+                              Confirm New Password
+                            </Label>
+                            <Input
+                              id="confirm-password"
+                              type="password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            className="mt-2 rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
+                            disabled={saving}
+                          >
+                            {saving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              'Update Password'
+                            )}
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
+                  </form>
                 </Card>
               </TabsContent>
 
@@ -451,34 +661,6 @@ export default function SettingsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Date & Time Format
-                      </h3>
-                      <div className="space-y-2">
-                        <Label htmlFor="date-format">Date Format</Label>
-                        <Select defaultValue="mdy">
-                          <SelectTrigger
-                            id="date-format"
-                            className="w-full md:w-[240px]"
-                          >
-                            <SelectValue placeholder="Select Date Format" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="mdy">MM/DD/YYYY</SelectItem>
-                            <SelectItem value="dmy">DD/MM/YYYY</SelectItem>
-                            <SelectItem value="ymd">YYYY/MM/DD</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button className="rounded-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90">
-                        Save Preferences
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>

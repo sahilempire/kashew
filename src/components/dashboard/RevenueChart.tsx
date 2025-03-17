@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
 
@@ -10,15 +10,47 @@ interface RevenueChartProps {
     month: string;
     revenue: number;
   }[];
+  growth?: number;
 }
 
-const RevenueChart = ({ className, data = defaultData }: RevenueChartProps) => {
+const RevenueChart = ({ className, data = [], growth = 0 }: RevenueChartProps) => {
   const [timeRange, setTimeRange] = useState<string>("year");
 
-  // Calculate total revenue and growth
-  const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
-  const growth = 12.5; // Placeholder growth percentage
+  const filteredData = useMemo(() => {
+    const now = new Date();
+    const filtered = [...data].filter(item => {
+      const itemDate = new Date(new Date().getFullYear(), getMonthIndex(item.month));
+      
+      switch (timeRange) {
+        case 'week':
+          const weekAgo = new Date(now);
+          weekAgo.setDate(now.getDate() - 7);
+          return itemDate >= weekAgo;
+        case 'month':
+          const monthAgo = new Date(now);
+          monthAgo.setMonth(now.getMonth() - 1);
+          return itemDate >= monthAgo;
+        case 'quarter':
+          const quarterAgo = new Date(now);
+          quarterAgo.setMonth(now.getMonth() - 3);
+          return itemDate >= quarterAgo;
+        default: // year
+          return true;
+      }
+    });
+
+    return filtered;
+  }, [data, timeRange]);
+
+  // Calculate total revenue from filtered data
+  const totalRevenue = filteredData.reduce((sum, item) => sum + item.revenue, 0);
   const isPositiveGrowth = growth > 0;
+
+  function getMonthIndex(monthName: string): number {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December'];
+    return months.indexOf(monthName);
+  }
 
   return (
     <div
@@ -63,69 +95,58 @@ const RevenueChart = ({ className, data = defaultData }: RevenueChartProps) => {
               )}
               <span className="text-sm font-medium text-black">
                 {isPositiveGrowth ? "+" : ""}
-                {growth}%
+                {growth.toFixed(1)}%
               </span>
             </div>
           </div>
 
           <div className="h-[220px] w-full relative mt-2">
-            {/* Chart visualization */}
-            <div className="absolute inset-0 flex items-end justify-between px-2">
-              {data.map((item, index) => {
-                // Calculate height based on revenue relative to max revenue
-                const maxRevenue = Math.max(...data.map((d) => d.revenue));
-                const height = (item.revenue / maxRevenue) * 180;
-                const delay = index * 30; // Faster staggered animation delay
+            {filteredData.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-black/70">
+                No revenue data available for the selected time range
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex items-end justify-between px-2">
+                {filteredData.map((item, index) => {
+                  // Calculate height based on revenue relative to max revenue
+                  const maxRevenue = Math.max(...filteredData.map((d) => d.revenue));
+                  const height = maxRevenue === 0 ? 0 : (item.revenue / maxRevenue) * 180;
+                  const delay = index * 30; // Faster staggered animation delay
 
-                return (
-                  <div
-                    key={index}
-                    className="flex flex-col items-center gap-1 w-full max-w-[40px]"
-                  >
+                  return (
                     <div
-                      className="relative w-8 rounded-t-md overflow-hidden group will-change-transform"
-                      style={{ height: `${height}px` }}
+                      key={index}
+                      className="flex flex-col items-center gap-1 w-full max-w-[40px]"
                     >
                       <div
-                        className="absolute bottom-0 w-full bg-gradient-to-t from-black/30 to-black/10 hover:from-black/40 hover:to-black/20 transition-all duration-300 animate-in slide-in-from-bottom"
-                        style={{
-                          height: `${height}px`,
-                          animationDelay: `${delay}ms`,
-                          animationDuration: "300ms",
-                        }}
-                      />
-                      <div className="absolute top-0 left-0 w-full opacity-0 group-hover:opacity-100 bg-black/10 p-1 text-[10px] text-black font-medium transition-opacity duration-200 text-center truncate">
-                        ${item.revenue.toLocaleString()}
+                        className="relative w-8 rounded-t-md overflow-hidden group will-change-transform"
+                        style={{ height: `${height}px` }}
+                      >
+                        <div
+                          className="absolute bottom-0 w-full bg-gradient-to-t from-black/30 to-black/10 hover:from-black/40 hover:to-black/20 transition-all duration-300 animate-in slide-in-from-bottom"
+                          style={{
+                            height: `${height}px`,
+                            animationDelay: `${delay}ms`,
+                            animationDuration: "300ms",
+                          }}
+                        />
+                        <div className="absolute top-0 left-0 w-full opacity-0 group-hover:opacity-100 bg-black/10 p-1 text-[10px] text-black font-medium transition-opacity duration-200 text-center truncate">
+                          ${item.revenue.toLocaleString()}
+                        </div>
                       </div>
+                      <span className="text-xs text-black/70 font-medium">
+                        {item.month.substring(0, 3)}
+                      </span>
                     </div>
-                    <span className="text-xs text-black/70 font-medium">
-                      {item.month}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
-
-// Default data for the chart
-const defaultData = [
-  { month: "Jan", revenue: 4500 },
-  { month: "Feb", revenue: 6200 },
-  { month: "Mar", revenue: 5100 },
-  { month: "Apr", revenue: 7800 },
-  { month: "May", revenue: 6800 },
-  { month: "Jun", revenue: 9200 },
-  { month: "Jul", revenue: 8100 },
-  { month: "Aug", revenue: 10500 },
-  { month: "Sep", revenue: 9300 },
-  { month: "Oct", revenue: 11200 },
-  { month: "Nov", revenue: 9800 },
-  { month: "Dec", revenue: 12500 },
-];
 
 export default RevenueChart;

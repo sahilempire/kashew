@@ -1,5 +1,7 @@
+'use client'
+
 import React from "react";
-import { Bell, Search, LogOut } from "lucide-react";
+import { Bell, Search, LogOut, Settings, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -12,70 +14,139 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import Link from 'next/link'
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 interface HeaderProps {
   title?: string;
   className?: string;
 }
 
-const Header = ({ title = "Dashboard", className = "" }: HeaderProps) => {
+export function Header() {
+  const pathname = usePathname()
   const { user, signOut } = useAuth();
 
+  // Function to generate initials from email or name
+  const getInitials = () => {
+    if (!user) return '??'
+    
+    // Try to get initials from email if no name
+    const email = user.email || ''
+    if (!user.user_metadata?.full_name) {
+      return email.substring(0, 2).toUpperCase()
+    }
+
+    // Get initials from full name
+    return user.user_metadata.full_name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+  }
+
+  // Function to get display name
+  const getDisplayName = () => {
+    if (!user) return 'User'
+    return user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+  }
+
   return (
-    <div
-      className={`h-16 border-b border-gray-100 flex items-center justify-between px-6 ${className}`}
-    >
-      <h1 className="text-xl font-semibold">{title}</h1>
-
-      <div className="flex items-center gap-4">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search..."
-            className="w-[200px] lg:w-[300px] pl-8 bg-background rounded-full"
-          />
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 hidden md:flex">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <span className="hidden font-bold sm:inline-block">
+              Kashew
+            </span>
+          </Link>
+          <nav className="flex items-center space-x-6 text-sm font-medium">
+            <Link
+              href="/dashboard"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname === "/dashboard" ? "text-foreground" : "text-foreground/60"
+              )}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/clients"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname?.startsWith("/clients")
+                  ? "text-foreground"
+                  : "text-foreground/60"
+              )}
+            >
+              Clients
+            </Link>
+            <Link
+              href="/invoices"
+              className={cn(
+                "transition-colors hover:text-foreground/80",
+                pathname?.startsWith("/invoices")
+                  ? "text-foreground"
+                  : "text-foreground/60"
+              )}
+            >
+              Invoices
+            </Link>
+          </nav>
         </div>
-
-        <ThemeSwitcher />
-
-        <button className="p-2 rounded-full hover:bg-accent relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-vibrant-pink"></span>
-        </button>
-
-        {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div className="h-8 w-8 rounded-full bg-vibrant-yellow flex items-center justify-center cursor-pointer">
-                <span className="text-sm font-medium text-black">
-                  {user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()}
-                </span>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                {user.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => signOut()}
-                className="text-red-500 cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <div className="w-full flex-1 md:w-auto md:flex-none">
+            {/* Search component will go here */}
+          </div>
+          <nav className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage
+                    src={user?.user_metadata?.avatar_url}
+                    alt={getDisplayName()}
+                  />
+                  <AvatarFallback>{getInitials()}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{getDisplayName()}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </nav>
+        </div>
       </div>
-    </div>
+    </header>
   );
-};
+}
 
 export default Header;

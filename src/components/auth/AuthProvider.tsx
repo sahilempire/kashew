@@ -1,183 +1,112 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-
-type User = {
-  id: string;
-  email: string;
-  name: string;
-  isVerified: boolean;
-} | null;
+import { createContext, useContext, useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Session, User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 
 type AuthContextType = {
-  user: User;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  googleSignIn: () => Promise<void>;
-  sendVerificationEmail: () => Promise<void>;
-};
+  user: User | null
+  session: Session | null
+  signOut: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  signUpWithEmail: (email: string, password: string, name: string) => Promise<void>
+  sendVerificationEmail: () => Promise<void>
+  loading: boolean
+}
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
 
-  // Mock authentication for demo purposes
   useEffect(() => {
-    // Check if user is stored in localStorage
-    if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("kashew_user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+      router.refresh()
+    })
+
+    return () => {
+      subscription.unsubscribe()
     }
-    setLoading(false);
-  }, []);
+  }, [supabase, router])
 
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (error) throw error
+  }
+
+  const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock user data
-      const userData = {
-        id: "user-123",
+      const { data, error } = await supabase.auth.signUp({
         email,
-        name: email.split("@")[0],
-        isVerified: true,
-      };
-
-      setUser(userData);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("kashew_user", JSON.stringify(userData));
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      })
+      
+      if (error) {
+        console.error('Sign up error:', error)
+        throw new Error(error.message)
+      }
+      
+      if (!data.user) {
+        throw new Error('No user data returned')
       }
     } catch (error) {
-      console.error("Sign in error:", error);
-      throw error;
-    } finally {
-      setLoading(false);
+      console.error('Sign up error:', error)
+      throw error
     }
-  };
-
-  const signUp = async (email: string, password: string, name: string) => {
-    setLoading(true);
-    try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock user data - not verified yet
-      const userData = {
-        id: "user-" + Math.random().toString(36).substring(2, 9),
-        email,
-        name,
-        isVerified: false,
-      };
-
-      setUser(userData);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("kashew_user", JSON.stringify(userData));
-      }
-
-      // In a real app, we would send a verification email here
-    } catch (error) {
-      console.error("Sign up error:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    setLoading(true);
-    try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      setUser(null);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("kashew_user");
-      }
-    } catch (error) {
-      console.error("Sign out error:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const googleSignIn = async () => {
-    setLoading(true);
-    try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock Google user data
-      const userData = {
-        id: "google-user-123",
-        email: "user@gmail.com",
-        name: "Google User",
-        isVerified: true,
-      };
-
-      setUser(userData);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("kashew_user", JSON.stringify(userData));
-      }
-    } catch (error) {
-      console.error("Google sign in error:", error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
 
   const sendVerificationEmail = async () => {
     if (!user) return;
+    
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: user.email!,
+    });
+    
+    if (error) throw error;
+  }
 
-    try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In a real app, we would send a verification email here
-      console.log(`Verification email sent to ${user.email}`);
-
-      // For demo purposes, let's just mark the user as verified
-      const updatedUser = { ...user, isVerified: true };
-      setUser(updatedUser);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("kashew_user", JSON.stringify(updatedUser));
-      }
-    } catch (error) {
-      console.error("Send verification email error:", error);
-      throw error;
-    }
-  };
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+    router.push('/auth/login')
+  }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        googleSignIn,
-        sendVerificationEmail,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      session,
+      signOut,
+      signInWithEmail,
+      signUpWithEmail,
+      sendVerificationEmail,
+      loading,
+    }}>
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider')
   }
-  return context;
+  return context
 }

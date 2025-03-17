@@ -5,6 +5,7 @@ import Script from "next/script";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,6 +33,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <TempoInit />
+            <Toaster richColors position="top-right" />
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -1,103 +1,110 @@
+"use client";
+
 import React from "react";
 import { cn } from "@/lib/utils";
+import { PieChart } from "lucide-react";
 
 interface InvoiceStatusChartProps {
   className?: string;
   data?: {
-    status: string;
-    value: number;
-    color: string;
-  }[];
+    paid: number;
+    pending: number;
+    overdue: number;
+  };
 }
 
-const InvoiceStatusChart = ({
-  className = "",
-  data = [
-    { status: "Paid", value: 65, color: "bg-green-500" },
-    { status: "Pending", value: 25, color: "bg-yellow-500" },
-    { status: "Overdue", value: 10, color: "bg-red-500" },
-  ],
-}: InvoiceStatusChartProps) => {
-  const total = data.reduce((acc, item) => acc + item.value, 0);
+const InvoiceStatusChart = ({ className, data }: InvoiceStatusChartProps) => {
+  if (!data) {
+    return (
+      <div
+        className={cn(
+          "modern-card w-full h-[350px] bg-background flex items-center justify-center",
+          className,
+        )}
+      >
+        <span className="text-muted-foreground">No invoice data available</span>
+      </div>
+    );
+  }
+
+  const total = data.paid + data.pending + data.overdue;
+  const calculatePercentage = (value: number) => ((value / total) * 100).toFixed(1);
 
   return (
-    <div className={cn("modern-card h-full w-full bg-vibrant-pink", className)}>
-      <div className="p-6 pb-2">
-        <h2 className="text-lg font-medium text-black">Invoice Status</h2>
+    <div
+      className={cn(
+        "modern-card w-full h-[350px] bg-background",
+        className,
+      )}
+    >
+      <div className="flex flex-row items-center justify-between p-6 pb-2">
+        <h2 className="text-lg font-medium">Invoice Status</h2>
+        <div className="rounded-full bg-vibrant-yellow/10 p-2">
+          <PieChart className="h-4 w-4 text-vibrant-yellow" />
+        </div>
       </div>
-      <div className="p-6 pt-0">
-        <div className="flex h-[250px] items-center justify-center">
-          <div className="relative h-[180px] w-[180px] rounded-full">
-            {/* Pie chart segments with animation */}
-            <div className="absolute inset-0 rounded-full overflow-hidden will-change-transform">
-              {data.map((segment, index) => {
-                const segmentPercentage = segment.value / total;
-                const segmentDegrees = segmentPercentage * 360;
-                const previousSegmentsDegrees = data
-                  .slice(0, index)
-                  .reduce((sum, d) => sum + (d.value / total) * 360, 0);
-
-                // Define vibrant colors based on status
-                const colors = [
-                  "linear-gradient(135deg, #1e9f6e, #0d9488)", // Paid - green gradient
-                  "linear-gradient(135deg, #f5d742, #fbbf24)", // Pending - yellow gradient
-                  "linear-gradient(135deg, #f472b6, #ec4899)", // Overdue - pink gradient
-                ];
-
-                return (
-                  <div
-                    key={index}
-                    className="absolute inset-0 animate-in fade-in zoom-in"
-                    style={{
-                      animationDelay: `${index * 120}ms`,
-                      animationDuration: "400ms",
-                      clipPath: `conic-gradient(from ${previousSegmentsDegrees}deg, currentColor ${segmentDegrees}deg, transparent ${segmentDegrees}deg)`,
-                      background: colors[index],
-                      opacity: 0.85,
-                    }}
-                  />
-                );
-              })}
+      <div className="p-6 pt-2">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-green-500" />
+                <span>Paid</span>
+              </div>
+              <span className="font-medium">
+                {data.paid} ({calculatePercentage(data.paid)}%)
+              </span>
             </div>
-            <div className="absolute inset-[15%] rounded-full bg-white/90 flex items-center justify-center animate-in fade-in zoom-in duration-300 shadow-inner">
-              <span className="text-3xl font-bold text-black">{total}%</span>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500"
+                style={{ width: `${(data.paid / total) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                <span>Pending</span>
+              </div>
+              <span className="font-medium">
+                {data.pending} ({calculatePercentage(data.pending)}%)
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-yellow-500"
+                style={{ width: `${(data.pending / total) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-red-500" />
+                <span>Overdue</span>
+              </div>
+              <span className="font-medium">
+                {data.overdue} ({calculatePercentage(data.overdue)}%)
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-500"
+                style={{ width: `${(data.overdue / total) * 100}%` }}
+              />
             </div>
           </div>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {data.map((item, index) => {
-            // Define vibrant colors based on status
-            const colors = [
-              "#1e9f6e", // Paid - green
-              "#f5d742", // Pending - yellow
-              "#f472b6", // Overdue - pink
-            ];
-
-            return (
-              <div
-                key={item.status}
-                className="flex items-center justify-between animate-in fade-in slide-in-from-right-4"
-                style={{
-                  animationDelay: `${index * 100}ms`,
-                  animationDuration: "300ms",
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: colors[index] }}
-                  />
-                  <span className="text-sm text-black font-medium">
-                    {item.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-black">{item.value}%</span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="mt-6 pt-6 border-t">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total Invoices</span>
+            <span className="font-medium">{total}</span>
+          </div>
         </div>
       </div>
     </div>

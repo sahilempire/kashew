@@ -24,49 +24,43 @@ interface AuthFormProps {
 
 const AuthForm = ({ className = "" }: AuthFormProps) => {
   const router = useRouter();
-  const { signIn, signUp, googleSignIn } = useAuth();
+  const { signInWithEmail, signUpWithEmail } = useAuth();
   const [formType, setFormType] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
+    setLoading(true);
 
     try {
       if (formType === "login") {
-        await signIn(email, password);
+        await signInWithEmail(email, password);
+        router.push("/dashboard");
       } else {
-        await signUp(email, password, name);
+        await signUpWithEmail(email, password, name);
+        router.push("/dashboard");
       }
-      router.push("/");
     } catch (err) {
+      console.error("Authentication error:", err);
       setError(
-        formType === "login"
-          ? "Failed to sign in. Please check your credentials."
-          : "Failed to create account. Please try again.",
+        err instanceof Error
+          ? err.message
+          : "An error occurred during authentication"
       );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      await googleSignIn();
-      router.push("/");
-    } catch (err) {
-      setError("Failed to sign in with Google. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    // This is a placeholder for Google sign-in functionality
+    // We'll implement this in the future
+    alert("Google sign-in is not implemented yet");
   };
 
   return (
@@ -109,7 +103,7 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -125,15 +119,15 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
               <Button
                 type="submit"
                 className="w-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing In...
@@ -154,7 +148,7 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -166,7 +160,7 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -177,15 +171,15 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
               <Button
                 type="submit"
                 className="w-full bg-vibrant-yellow text-black hover:bg-vibrant-yellow/90"
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating Account...
@@ -210,16 +204,11 @@ const AuthForm = ({ className = "" }: AuthFormProps) => {
         </div>
 
         <div className="flex flex-col space-y-2">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-          >
+          <Button variant="outline" className="w-full" disabled={loading}>
             <Mail className="mr-2 h-4 w-4" />
             Google
           </Button>
-          <Button variant="outline" className="w-full" disabled={isLoading}>
+          <Button variant="outline" className="w-full" disabled={loading}>
             <Github className="mr-2 h-4 w-4" />
             GitHub
           </Button>

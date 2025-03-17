@@ -21,12 +21,7 @@ interface AnalyticsSummaryProps {
 
 const AnalyticsSummary = ({
   className = "",
-  data = {
-    totalRevenue: 45250.75,
-    outstandingInvoices: 12340.5,
-    paidInvoices: 32910.25,
-    overdueInvoices: 5670.25,
-  },
+  data,
 }: AnalyticsSummaryProps) => {
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -38,6 +33,19 @@ const AnalyticsSummary = ({
     }).format(amount);
   };
 
+  if (!data) {
+    return (
+      <div className={cn(
+        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full",
+        className,
+      )}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-[140px] rounded-lg bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -48,17 +56,13 @@ const AnalyticsSummary = ({
       {/* Total Revenue */}
       <div className="modern-card bg-gradient-to-br from-vibrant-yellow to-amber-400 p-6 transform transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 duration-300 will-change-transform">
         <div className="flex items-center justify-between">
-          <div className="rounded-full bg-black/10 p-3">
-            <DollarSign className="h-6 w-6 text-black" />
-          </div>
-          <div className="flex items-center gap-1">
-            <ArrowUpRight className="h-4 w-4 text-black" />
-            <span className="text-sm font-medium text-black">+12.5%</span>
+          <div className="rounded-full bg-white/10 p-3">
+            <DollarSign className="h-6 w-6 text-white" />
           </div>
         </div>
         <div className="mt-4">
-          <p className="text-sm text-black/70">Total Revenue</p>
-          <h3 className="text-3xl font-bold text-black">
+          <p className="text-sm text-white/70">Total Revenue</p>
+          <h3 className="text-3xl font-bold text-white">
             {formatCurrency(data.totalRevenue)}
           </h3>
         </div>
@@ -70,17 +74,13 @@ const AnalyticsSummary = ({
         style={{ animationDelay: "80ms" }}
       >
         <div className="flex items-center justify-between">
-          <div className="rounded-full bg-black/10 p-3">
-            <Clock className="h-6 w-6 text-black" />
-          </div>
-          <div className="flex items-center gap-1">
-            <ArrowUpRight className="h-4 w-4 text-black" />
-            <span className="text-sm font-medium text-black">+5.2%</span>
+          <div className="rounded-full bg-white/10 p-3">
+            <Clock className="h-6 w-6 text-white" />
           </div>
         </div>
         <div className="mt-4">
-          <p className="text-sm text-black/70">Outstanding Invoices</p>
-          <h3 className="text-3xl font-bold text-black">
+          <p className="text-sm text-white/70">Outstanding Invoices</p>
+          <h3 className="text-3xl font-bold text-white">
             {formatCurrency(data.outstandingInvoices)}
           </h3>
         </div>
@@ -94,10 +94,6 @@ const AnalyticsSummary = ({
         <div className="flex items-center justify-between">
           <div className="rounded-full bg-white/20 p-3">
             <FileText className="h-6 w-6 text-white" />
-          </div>
-          <div className="flex items-center gap-1">
-            <ArrowUpRight className="h-4 w-4 text-white" />
-            <span className="text-sm font-medium text-white">+18.3%</span>
           </div>
         </div>
         <div className="mt-4">
@@ -116,10 +112,6 @@ const AnalyticsSummary = ({
         <div className="flex items-center justify-between">
           <div className="rounded-full bg-white/10 p-3">
             <AlertTriangle className="h-6 w-6 text-white" />
-          </div>
-          <div className="flex items-center gap-1">
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
-            <span className="text-sm font-medium text-red-500">-3.1%</span>
           </div>
         </div>
         <div className="mt-4">
