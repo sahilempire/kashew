@@ -77,7 +77,6 @@ export default function EditInvoicePage() {
         dueDate: data.dueDate,
         items: data.items,
         country: data.country,
-        taxNumber: data.taxNumber,
         taxRate: data.taxRate,
         taxName: data.taxName,
         subtotal: data.subtotal,
@@ -172,7 +171,6 @@ export default function EditInvoicePage() {
               clientId: invoice.client.id,
               items: invoice.items,
               country: invoice.country || "US",
-              taxNumber: invoice.taxNumber || "",
             }}
           />
         )}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, Send, DollarSign } from "lucide-react";
+import { ArrowLeft, Download, Send, DollarSign, Printer } from "lucide-react";
 import { getInvoices } from "@/lib/queries";
 
 interface InvoiceItem {
@@ -103,7 +103,7 @@ export default function InvoiceDetailPage() {
   return (
     <DashboardLayout title={`Invoice ${invoice.number}`}>
       <div className="space-y-6 pb-8">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center print:hidden">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
@@ -120,6 +120,10 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print
+            </Button>
             <Button variant="outline" onClick={() => alert("Download functionality coming soon")}>
               <Download className="mr-2 h-4 w-4" />
               Download
@@ -134,8 +138,8 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="modern-card bg-background p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:gap-8 print-no-break">
+          <div className="modern-card bg-background p-6 print:border-none print:shadow-none print:p-0">
             <h2 className="text-lg font-semibold mb-4">Invoice Details</h2>
             <div className="space-y-4">
               <div>
@@ -169,7 +173,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
 
-          <div className="modern-card bg-background p-6">
+          <div className="modern-card bg-background p-6 print:border-none print:shadow-none print:p-0">
             <h2 className="text-lg font-semibold mb-4">Client Information</h2>
             <div className="space-y-4">
               <div>
@@ -184,7 +188,7 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
-        <div className="modern-card bg-background p-6">
+        <div className="modern-card bg-background p-6 print:border-none print:shadow-none print:p-0 print-no-break">
           <h2 className="text-lg font-semibold mb-4">Items</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -236,6 +240,11 @@ export default function InvoiceDetailPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="text-center text-sm text-muted-foreground mt-8 print-no-break">
+          <p>Thank you for your business!</p>
+          <p className="mt-1">Payment is due by {formatDate(invoice.dueDate)}</p>
         </div>
       </div>
     </DashboardLayout>
